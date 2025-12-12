@@ -1,0 +1,7 @@
+{
+  "name": "NEXUS AI",
+  "description": "A smart AI chat interface that intelligently routes prompts to Gemini, Claude, or GPT-4 based on context.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
