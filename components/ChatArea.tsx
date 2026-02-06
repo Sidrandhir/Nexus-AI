@@ -1,0 +1,315 @@
+import React, { useRef, useEffect, useState } from 'react';
+import { Message, AIModel, RouterResult, ChatSession, GroundingChunk } from '../types';
+import { Icons } from '../constants';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { 
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
+  BarChart, Bar, LineChart, Line 
+} from 'recharts';
+
+interface ChatAreaProps {
+  session: ChatSession;
+  isLoading: boolean;
+  routingInfo: RouterResult | null;
+  onExport: () => void;
+  onShare: () => void;
+  onModelChange: (model: AIModel | 'auto') => void;
+  onToggleSidebar: () => void;
+  isSidebarOpen: boolean;
+  onRegenerate: (messageId: string) => void;
+  onEditMessage: (messageId: string, newContent: string) => void;
+  onFeedback: (messageId: string, feedback: 'good' | 'bad' | null) => void;
+  streamingTokens?: number;
+  theme: 'light' | 'dark';
+  onThemeToggle: () => void;
+  onSuggestionClick?: (text: string) => void;
+}
+
+const EnhancedTable = ({ children, ...props }: any) => {
+  const [copied, setCopied] = useState(false);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const handleCopyData = () => {
+    if (!tableRef.current) return;
+    const rows = Array.from(tableRef.current.querySelectorAll('tr')) as HTMLTableRowElement[];
+    const tsv = rows.map(row => {
+      const cells = Array.from(row.querySelectorAll('th, td')) as HTMLElement[];
+      return cells.map(cell => cell.innerText.trim()).join('\t');
+    }).join('\n');
+    navigator.clipboard.writeText(tsv);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="group/table relative my-6 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-tertiary)]/5 transition-all hover:border-[var(--text-secondary)]/30 shadow-sm">
+      <div className="absolute top-2 right-2 z-10 opacity-0 group-hover/table:opacity-100 transition-opacity">
+        <button onClick={handleCopyData} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all active:scale-95">
+          {copied ? <Icons.Check className="w-3 h-3" /> : <Icons.Copy className="w-3 h-3" />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <div className="overflow-x-auto custom-scrollbar"><table ref={tableRef} className="w-full">{children}</table></div>
+    </div>
+  );
+};
+
+const EnhancedChart = ({ dataStr }: { dataStr: string }) => {
+  try {
+    const config = JSON.parse(dataStr);
+    const { type = 'area', data, label = 'Data Insights' } = config;
+    const accentColor = 'var(--accent)';
+    const CustomTooltip = ({ active, payload, label }: any) => {
+      if (active && payload && payload.length) {
+        return (
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] p-3 rounded-lg shadow-xl">
+            <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-0.5">{label}</p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">{payload[0].value}</p>
+          </div>
+        );
+      }
+      return null;
+    };
+    return (
+      <div className="my-6 p-4 sm:p-6 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]/20 relative overflow-hidden group/chart transition-all">
+        <div className="mb-4 flex justify-between items-center opacity-60"><h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">{label}</h4></div>
+        <div className="h-56 sm:h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            {type === 'bar' ? (
+              <BarChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--bg-tertiary)', opacity: 0.2 }} />
+                <Bar dataKey="value" fill={accentColor} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            ) : type === 'line' ? (
+              <LineChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line type="monotone" dataKey="value" stroke={accentColor} strokeWidth={2.5} dot={{ r: 2.5, fill: 'var(--bg-primary)', strokeWidth: 1.5 }} activeDot={{ r: 4 }} />
+              </LineChart>
+            ) : (
+              <AreaChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                <defs><linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={accentColor} stopOpacity={0.15}/><stop offset="95%" stopColor={accentColor} stopOpacity={0}/></linearGradient></defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="value" stroke={accentColor} strokeWidth={2.5} fillOpacity={1} fill="url(#colorVal)" />
+              </AreaChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+      </div>
+    );
+  } catch (err) { return null; }
+};
+
+const CodeBlock = ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+  const [copied, setCopied] = useState(false);
+  const codeRef = useRef<HTMLElement>(null);
+  if (className === 'language-chart') return <EnhancedChart dataStr={children?.toString() || ''} />;
+  const handleCopy = () => {
+    const code = codeRef.current?.innerText || "";
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="relative group/code my-6 border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--code-bg)] shadow-sm max-w-full transition-all hover:border-[var(--text-secondary)]/20">
+      <div className="flex items-center justify-between px-4 py-2 bg-[var(--code-header)] border-b border-[var(--border)]">
+        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-50">{className?.replace('language-', '') || 'SOURCE'}</span>
+        <button onClick={handleCopy} className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${copied ? 'text-emerald-500' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+          {copied ? <Icons.Check className="w-3 h-3" /> : <Icons.Copy className="w-3 h-3" />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <pre className="overflow-x-auto custom-scrollbar leading-relaxed"><code ref={codeRef} className={`${className} block p-5 w-fit min-w-full text-[var(--text-primary)] text-[0.85rem]`}>{children}</code></pre>
+    </div>
+  );
+};
+
+const ChatArea: React.FC<ChatAreaProps> = ({ 
+  session, 
+  isLoading, 
+  onExport, 
+  onToggleSidebar,
+  isSidebarOpen,
+  onRegenerate,
+  onEditMessage,
+  onFeedback,
+  theme,
+  onThemeToggle,
+  onSuggestionClick
+}) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const messages = session?.messages || [];
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [showScrollDown, setShowScrollDown] = useState(false);
+
+  useEffect(() => {
+    if (scrollRef.current && autoScroll) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: isLoading ? 'auto' : 'smooth'
+      });
+    }
+  }, [messages, isLoading, autoScroll]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 100;
+    setAutoScroll(isAtBottom);
+    setShowScrollDown(!isAtBottom);
+  };
+
+  const handleCopyText = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const submitEdit = (id: string) => {
+    if (editContent.trim()) {
+      onEditMessage(id, editContent.trim());
+      setEditingId(null);
+    }
+  };
+
+  const getModelDisplayName = (model?: AIModel) => {
+    if (!model) return "Nexus AI";
+    switch (model) {
+      case AIModel.GPT4: return "Reasoning & Planning";
+      case AIModel.CLAUDE: return "Coding & Writing";
+      case AIModel.GEMINI: return "Search & Speed";
+      default: return "Nexus AI";
+    }
+  };
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-primary)] relative overflow-hidden">
+      <header className="h-14 sm:h-16 border-b border-[var(--border)] glass flex items-center justify-between px-4 sm:px-8 flex-shrink-0 pt-safe z-[30] transition-colors relative">
+        <div className="flex items-center gap-4">
+          {!isSidebarOpen && (
+            <button onClick={onToggleSidebar} aria-label="Toggle sidebar" className="p-2 -ml-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 sm:hidden transition-colors">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+          )}
+          <div className="flex flex-col">
+            <h2 className="text-[11px] font-black uppercase tracking-[0.25em] text-[var(--text-primary)] truncate max-w-[140px] sm:max-w-none">{session?.title || "New Chat"}</h2>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button onClick={onThemeToggle} aria-label="Toggle theme" data-nexus-tooltip={theme === 'dark' ? 'Light mode' : 'Dark mode'} className="p-2.5 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-colors">{theme === 'dark' ? <Icons.Sun className="w-4 h-4" /> : <Icons.Moon className="w-4 h-4" />}</button>
+          <button onClick={onExport} aria-label="Export conversation" data-nexus-tooltip="Export chat" className="p-2.5 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-colors"><Icons.Download className="w-4 h-4" /></button>
+        </div>
+      </header>
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 sm:px-8 py-8 sm:py-12 touch-action-pan-y overscroll-behavior-contain">
+        <div className="max-w-3xl mx-auto flex flex-col gap-12 pb-24">
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center pt-32 text-center animate-in fade-in duration-1000">
+               <div className="w-16 h-16 bg-[var(--accent)]/5 rounded-2xl flex items-center justify-center border border-[var(--accent)]/10"><Icons.Robot className="w-8 h-8 text-[var(--accent)] opacity-30" /></div>
+            </div>
+          )}
+          {messages.map((msg, idx) => (
+            <div key={msg.id} className={`group flex flex-col gap-3 animate-in fade-in duration-600 ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-full`}>
+
+              <div className="relative max-w-full sm:max-w-[92%] w-auto min-w-0">
+                <div className={`p-6 sm:p-7 rounded-2xl border transition-all ${msg.role === 'user' ? 'bg-[var(--bg-tertiary)]/30 border-[var(--border)] text-[var(--text-primary)] shadow-sm' : 'bg-transparent border-transparent text-[var(--text-primary)]'} overflow-hidden`}>
+                  {isLoading && msg.role === 'assistant' && !msg.content ? (
+                    <div className="flex items-center gap-1.5 py-4"><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse" /><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-75" /><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-150" /></div>
+                  ) : editingId === msg.id ? (
+                    <div className="space-y-4">
+                      <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} aria-label="Edit message content" placeholder="Edit your message..." className="w-full bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl p-5 text-sm focus:outline-none focus:border-[var(--accent)] transition-all leading-relaxed text-[var(--text-primary)] shadow-inner" rows={3} />
+                      <div className="flex gap-2"><button onClick={() => submitEdit(msg.id)} className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-[var(--accent)]/10">Update</button><button onClick={() => setEditingId(null)} className="px-5 py-2.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] rounded-xl text-[10px] font-black uppercase tracking-widest border border-[var(--border)] active:scale-95 transition-all">Cancel</button></div>
+                    </div>
+                  ) : (
+                    <div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ table: EnhancedTable, code: ({ node, inline, className, children, ...props }: any) => { return !inline ? (<CodeBlock className={className} children={children} />) : (<code className={className} {...props}>{children}</code>); } }}>{msg.content}</ReactMarkdown></div>
+                  )}
+                  {msg.image && <div className="mt-8 rounded-xl overflow-hidden border border-[var(--border)] shadow-xl"><img src={`data:${msg.image.mimeType};base64,${msg.image.inlineData.data}`} alt="Context Attached" className="max-w-full h-auto" /></div>}
+                  {msg.groundingChunks && msg.groundingChunks.length > 0 && (
+                    <div className="mt-10 pt-6 border-t border-[var(--border)] animate-in fade-in duration-700">
+                      <div className="flex items-center gap-2 mb-4">
+                         <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {msg.groundingChunks.map((chunk: GroundingChunk, i: number) => {
+                          const uri = chunk.web?.uri || chunk.maps?.uri;
+                          const title = chunk.web?.title || chunk.maps?.title;
+                          if (!uri) return null;
+                          return (
+                            <a key={i} href={uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]/40 border border-[var(--border)] hover:border-[var(--accent)]/50 transition-all group shadow-sm active:scale-[0.98]">
+                              <span className="text-[10px] font-bold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] truncate max-w-[180px]">{title || "Source"}</span>
+                              <Icons.PanelLeftOpen className="w-2 h-2 opacity-30 group-hover:opacity-100 rotate-180 transition-opacity" />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {idx === messages.length - 1 && msg.role === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && !isLoading && (
+                  <div className="mt-8 flex flex-col gap-3 items-start animate-in fade-in slide-in-from-bottom-2 duration-700">
+                    <div className="flex flex-wrap gap-2">{msg.suggestions.map((suggestion, i) => (<button key={i} onClick={() => onSuggestionClick?.(suggestion)} className="px-4 py-2.5 rounded-xl bg-[var(--bg-tertiary)]/20 border border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] text-left active:scale-[0.97] shadow-sm">{suggestion}</button>))}</div>
+                  </div>
+                )}
+                <div className={`mt-2 flex items-center gap-1 ${msg.role === 'assistant' ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity ${msg.role === 'user' ? 'justify-end pr-2' : 'pl-2'}`}>
+                  <button onClick={() => handleCopyText(msg.content, msg.id)} aria-label="Copy message" data-nexus-tooltip={copiedId === msg.id ? 'Copied' : 'Copy'} className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all">{copiedId === msg.id ? <Icons.Check className="w-3.5 h-3.5 text-[var(--accent)]" /> : <Icons.Copy className="w-3.5 h-3.5" />}</button>
+                  {msg.role === 'user' && <button onClick={() => { setEditingId(msg.id); setEditContent(msg.content); }} aria-label="Edit message" data-nexus-tooltip="Edit" className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all"><Icons.Edit className="w-3.5 h-3.5" /></button>}
+                  {msg.role === 'assistant' && (
+                    <>
+                      <button onClick={() => onRegenerate(msg.id)} aria-label="Regenerate response" data-nexus-tooltip="Retry" className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all"><Icons.RotateCcw className="w-3.5 h-3.5" /></button>
+                      <div className="w-px h-4 bg-[var(--border)] mx-0.5" />
+                      <button 
+                        onClick={() => onFeedback(msg.id, msg.feedback === 'good' ? null : 'good')} 
+                        aria-label="Good response" 
+                        data-nexus-tooltip="Good response" 
+                        className={`p-2 rounded-xl transition-all ${
+                          msg.feedback === 'good' 
+                            ? 'text-[var(--accent)] bg-[var(--accent)]/10' 
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
+                        }`}
+                      >
+                        <Icons.ThumbsUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button 
+                        onClick={() => onFeedback(msg.id, msg.feedback === 'bad' ? null : 'bad')} 
+                        aria-label="Bad response" 
+                        data-nexus-tooltip="Bad response" 
+                        className={`p-2 rounded-xl transition-all ${
+                          msg.feedback === 'bad' 
+                            ? 'text-red-400 bg-red-500/10' 
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
+                        }`}
+                      >
+                        <Icons.ThumbsDown className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          {isLoading && !messages.some(m => m.id.startsWith('assistant-')) && (
+            <div className="flex flex-col gap-4 items-start animate-in fade-in duration-500">
+              <div className="flex gap-2 p-5 rounded-2xl bg-[var(--bg-tertiary)]/20 border border-[var(--border)] shadow-inner"><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse" /><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-100" /><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-200" /></div>
+            </div>
+          )}
+        </div>
+      </div>
+      {showScrollDown && (
+        <button onClick={() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })} aria-label="Scroll to latest message" className="absolute bottom-8 right-8 sm:right-12 w-11 h-11 rounded-full glass border border-[var(--border)] flex items-center justify-center text-[var(--text-primary)] shadow-2xl z-20 hover:scale-110 active:scale-90 transition-all"><svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 13l5 5 5-5M7 6l5 5 5-5" /></svg></button>
+      )}
+    </div>
+  );
+};
+
+export default ChatArea;
