@@ -2,17 +2,15 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AIModel, Message, RouterResult, MessageImage, GroundingChunk, AttachedDocument, QueryIntent } from "../types";
 import { logError } from "./analyticsService";
 
-// NEXUS CIRCUIT BREAKER - Prevent infinite retry loops on Quota errors
+// Concurrency guard — only one request at a time
 let isRequestPending = false;
 let lastRequestTimestamp = 0;
-let consecutiveQuotaErrors = 0;
-const MIN_REQUEST_GAP = 1200;
-const MAX_QUOTA_RETRIES = 2;
+const MIN_REQUEST_GAP = 500;
 
-// Model Mapping - NEXUS FLASH is the primary stable engine with higher quotas
+// Model Mapping — Paid billing: use best available models freely
 const CORE_MODELS = {
-  FLASH: 'gemini-3-flash-preview',
-  PRO: 'gemini-3-pro-preview',
+  FLASH: 'gemini-2.0-flash',
+  PRO: 'gemini-2.5-pro-preview-06-05',
 };
 
 const SYSTEM_CORE = `
@@ -44,6 +42,8 @@ const classifyIntent = (prompt: string, hasImage: boolean, hasDocs: boolean): Qu
   return 'general';
 };
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export const routePrompt = (prompt: string, hasImage: boolean = false, hasDocs: boolean = false): RouterResult => {
   const intent = classifyIntent(prompt, hasImage, hasDocs);
   switch (intent) {
@@ -70,18 +70,14 @@ export const getAIResponse = async (
   
   if (isRequestPending) throw new Error("Synchronization in progress. Please wait for the current stream to complete.");
   
+  // Smooth out rapid requests — wait instead of throwing
   const now = Date.now();
   if (now - lastRequestTimestamp < MIN_REQUEST_GAP) {
-    throw new Error("Cooling down neural links. Interface stabilizing...");
-  }
-
-  // Prevent spamming if we are consistently hitting quota
-  if (consecutiveQuotaErrors >= MAX_QUOTA_RETRIES && (now - lastRequestTimestamp < 60000)) {
-    throw new Error("The Nexus link is currently saturated (Global API Quota Exceeded). Please allow the channel 60 seconds to reset.");
+    await sleep(MIN_REQUEST_GAP - (now - lastRequestTimestamp));
   }
 
   isRequestPending = true;
-  lastRequestTimestamp = now;
+  lastRequestTimestamp = Date.now();
 
   const routing = (manualModel && manualModel !== 'auto') 
     ? { model: manualModel, reason: "Manual Sync", explanation: `Routing to ${manualModel}.`, confidence: 1.0, complexity: 0.5, intent: classifyIntent(prompt, !!image, documents.length > 0) }
@@ -89,7 +85,7 @@ export const getAIResponse = async (
 
   if (onRouting) onRouting(routing);
 
-  // FLASH is prioritized for most tasks to save PRO quota for extreme logic
+  // Use PRO for coding/complex tasks, FLASH for everything else
   const targetEngine = (routing.intent === 'coding' && routing.model === AIModel.CLAUDE) ? CORE_MODELS.PRO : CORE_MODELS.FLASH;
 
   // Real-time Clock Context injection
@@ -102,96 +98,123 @@ export const getAIResponse = async (
 - Precise context is required for "today", "yesterday", and "current" queries.
 `;
 
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const contents: any[] = history.slice(-6).map(msg => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
-    
-    const currentParts: any[] = [];
-    if (documents.length > 0) {
-      documents.forEach(doc => currentParts.push({ text: `[DATA ATTACHMENT: ${doc.title}]\n${doc.content}\n---` }));
-    }
-    if (image) currentParts.push({ inlineData: { data: image.inlineData.data, mimeType: image.mimeType } });
-    currentParts.push({ text: prompt });
-    contents.push({ role: 'user', parts: currentParts });
+  // Retry with exponential backoff for transient errors
+  const MAX_RETRIES = 4;
+  let lastError: any = null;
 
-    const tools: any[] = [];
-    if (routing.intent === 'live' || routing.model === AIModel.GEMINI) {
-      tools.push({ googleSearch: {} });
-    }
-
-    let fullText = "";
-    let usage: any = { totalTokenCount: 0, promptTokenCount: 0, candidatesTokenCount: 0 };
-    let groundingChunks: GroundingChunk[] = [];
-
-    const finalSystemInstruction = `${SYSTEM_CORE}\n${dateContext}\n[PREFERENCE]: ${personification}`;
-
-    if (onStreamChunk) {
-      const result = await ai.models.generateContentStream({
-        model: targetEngine,
-        contents,
-        config: {
-          systemInstruction: finalSystemInstruction,
-          temperature: routing.intent === 'coding' ? 0.1 : 0.6,
-          tools: tools.length > 0 ? tools : undefined
-        },
-      });
-
-      for await (const chunk of result) {
-        if (signal?.aborted) break;
-        const text = chunk.text || "";
-        fullText += text;
-        onStreamChunk(text);
-        if (chunk.usageMetadata) usage = chunk.usageMetadata;
-        const chunks = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
-        if (chunks) groundingChunks = [...groundingChunks, ...(chunks as GroundingChunk[])];
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
+      // Send up to 10 history messages — paid account can handle the tokens
+      const contents: any[] = history.slice(-10).map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      }));
+      
+      const currentParts: any[] = [];
+      if (documents.length > 0) {
+        documents.forEach(doc => currentParts.push({ text: `[DATA ATTACHMENT: ${doc.title}]\n${doc.content}\n---` }));
       }
-    } else {
-      const response = await ai.models.generateContent({
-        model: targetEngine,
-        contents,
-        config: {
-          systemInstruction: finalSystemInstruction,
-          temperature: routing.intent === 'coding' ? 0.1 : 0.6,
-          tools: tools.length > 0 ? tools : undefined
-        },
-      });
-      fullText = response.text || "";
-      usage = response.usageMetadata || usage;
-      groundingChunks = (response.candidates?.[0]?.groundingMetadata?.groundingChunks as GroundingChunk[]) || [];
-    }
+      if (image) currentParts.push({ inlineData: { data: image.inlineData.data, mimeType: image.mimeType } });
+      currentParts.push({ text: prompt });
+      contents.push({ role: 'user', parts: currentParts });
 
-    consecutiveQuotaErrors = 0; // Success, reset breaker
-    return { 
-      content: fullText.trim(), 
-      model: routing.model, 
-      tokens: usage.totalTokenCount,
-      inputTokens: usage.promptTokenCount,
-      outputTokens: usage.candidatesTokenCount,
-      groundingChunks: groundingChunks.length > 0 ? groundingChunks : undefined,
-      routingContext: { ...routing, engine: targetEngine }
-    };
-  } catch (err: any) {
-    const msg = err.message || "";
-    if (msg.includes('quota') || msg.includes('429')) {
-      consecutiveQuotaErrors++;
-      throw new Error("Nexus Daily Limit Reached. To continue, please verify your API key selection or try again later.");
+      const tools: any[] = [];
+      if (routing.intent === 'live' || routing.model === AIModel.GEMINI) {
+        tools.push({ googleSearch: {} });
+      }
+
+      let fullText = "";
+      let usage: any = { totalTokenCount: 0, promptTokenCount: 0, candidatesTokenCount: 0 };
+      let groundingChunks: GroundingChunk[] = [];
+
+      const finalSystemInstruction = `${SYSTEM_CORE}\n${dateContext}\n[PREFERENCE]: ${personification}`;
+
+      if (onStreamChunk) {
+        const result = await ai.models.generateContentStream({
+          model: targetEngine,
+          contents,
+          config: {
+            systemInstruction: finalSystemInstruction,
+            temperature: routing.intent === 'coding' ? 0.1 : 0.6,
+            tools: tools.length > 0 ? tools : undefined
+          },
+        });
+
+        for await (const chunk of result) {
+          if (signal?.aborted) break;
+          const text = chunk.text || "";
+          fullText += text;
+          onStreamChunk(text);
+          if (chunk.usageMetadata) usage = chunk.usageMetadata;
+          const chunks = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
+          if (chunks) groundingChunks = [...groundingChunks, ...(chunks as GroundingChunk[])];
+        }
+      } else {
+        const response = await ai.models.generateContent({
+          model: targetEngine,
+          contents,
+          config: {
+            systemInstruction: finalSystemInstruction,
+            temperature: routing.intent === 'coding' ? 0.1 : 0.6,
+            tools: tools.length > 0 ? tools : undefined
+          },
+        });
+        fullText = response.text || "";
+        usage = response.usageMetadata || usage;
+        groundingChunks = (response.candidates?.[0]?.groundingMetadata?.groundingChunks as GroundingChunk[]) || [];
+      }
+
+      isRequestPending = false;
+      return { 
+        content: fullText.trim(), 
+        model: routing.model, 
+        tokens: usage.totalTokenCount,
+        inputTokens: usage.promptTokenCount,
+        outputTokens: usage.candidatesTokenCount,
+        groundingChunks: groundingChunks.length > 0 ? groundingChunks : undefined,
+        routingContext: { ...routing, engine: targetEngine }
+      };
+    } catch (err: any) {
+      lastError = err;
+      const msg = (err.message || "").toLowerCase();
+      
+      // Retry on transient / rate-limit errors
+      if (msg.includes('429') || msg.includes('quota') || msg.includes('resource exhausted') || msg.includes('rate limit') || msg.includes('503') || msg.includes('unavailable') || msg.includes('overloaded')) {
+        if (attempt < MAX_RETRIES - 1) {
+          const backoffMs = Math.min(1500 * Math.pow(2, attempt), 20000); // 1.5s → 3s → 6s → 12s
+          console.warn(`API rate limit hit (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${backoffMs}ms...`);
+          isRequestPending = false;
+          await sleep(backoffMs);
+          isRequestPending = true;
+          lastRequestTimestamp = Date.now();
+          continue;
+        }
+        // All retries exhausted
+        isRequestPending = false;
+        logError(msg, true, routing.model);
+        throw new Error("API temporarily overloaded. Please wait a few seconds and try again.");
+      }
+      
+      // Non-retryable error — throw immediately
+      isRequestPending = false;
+      logError(msg, true, routing.model);
+      throw err;
     }
-    logError(msg, true, routing.model);
-    throw err;
-  } finally {
-    isRequestPending = false;
   }
+
+  isRequestPending = false;
+  throw lastError;
 };
 
 export const generateFollowUpSuggestions = async (lastMsg: string, intent: QueryIntent): Promise<string[]> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const trimmed = lastMsg.length > 2000 ? lastMsg.substring(0, 2000) : lastMsg;
     const response = await ai.models.generateContent({
       model: CORE_MODELS.FLASH,
-      contents: `Suggest 3 follow-up questions for: "${lastMsg}". Return JSON array.`,
+      contents: `Suggest 3 follow-up questions for: "${trimmed}". Return JSON array.`,
       config: { responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } } }
     });
     return JSON.parse(response.text || "[]").slice(0, 3);
@@ -201,9 +224,10 @@ export const generateFollowUpSuggestions = async (lastMsg: string, intent: Query
 export const generateChatTitle = async (firstMessage: string): Promise<string> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const trimmed = firstMessage.length > 1000 ? firstMessage.substring(0, 1000) : firstMessage;
     const response = await ai.models.generateContent({
       model: CORE_MODELS.FLASH,
-      contents: `Summarize the following first message into a professional, concise 3 to 5 word title for a chat conversation: "${firstMessage}". Return ONLY the title text. Do not use quotes or periods.`,
+      contents: `Summarize the following first message into a professional, concise 3 to 5 word title for a chat conversation: "${trimmed}". Return ONLY the title text. Do not use quotes or periods.`,
     });
     return response.text?.trim().replace(/['"]/g, '').replace(/\.$/, '') || "New Session";
   } catch (err) { return "New Session"; }
