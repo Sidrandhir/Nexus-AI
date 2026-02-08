@@ -240,6 +240,39 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
               <div className="relative max-w-full sm:max-w-[92%] w-auto min-w-0">
                 <div className={`p-6 sm:p-7 rounded-2xl border transition-all ${msg.role === 'user' ? 'bg-[var(--bg-tertiary)]/30 border-[var(--border)] text-[var(--text-primary)] shadow-sm' : 'bg-transparent border-transparent text-[var(--text-primary)]'} overflow-hidden`}>
+                  {msg.documents && msg.documents.length > 0 && (
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      {msg.documents.map((doc, di) => {
+                        const ext = doc.title.split('.').pop()?.toLowerCase() || '';
+                        const isZip = ext === 'zip';
+                        const fileInfo: Record<string, { color: string; label: string; icon: string }> = {
+                          pdf: { color: 'text-red-400 bg-red-500/10 border-red-500/20', label: 'PDF', icon: '📄' },
+                          docx: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'DOC', icon: '📝' },
+                          doc: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'DOC', icon: '📝' },
+                          xlsx: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'XLS', icon: '📊' },
+                          xls: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'XLS', icon: '📊' },
+                          csv: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'CSV', icon: '📊' },
+                          zip: { color: 'text-orange-400 bg-orange-500/10 border-orange-500/20', label: 'ZIP', icon: '📦' },
+                          json: { color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', label: 'JSON', icon: '{ }' },
+                          md: { color: 'text-purple-400 bg-purple-500/10 border-purple-500/20', label: 'MD', icon: '📑' },
+                        };
+                        const info = fileInfo[ext] || { color: 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border-[var(--border)]', label: 'TXT', icon: '📄' };
+                        const zipFileCount = isZip ? (doc.content.match(/--- File: /g)?.length || 0) : 0;
+                        
+                        return (
+                          <div key={di} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${info.color} min-w-[120px] max-w-[220px]`}>
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${info.color}`}>
+                              <span className="text-xs">{info.icon}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-[var(--text-primary)] truncate">{doc.title}</p>
+                              <p className="text-[10px] text-[var(--text-secondary)]">{isZip ? `${zipFileCount} file${zipFileCount !== 1 ? 's' : ''}` : `${info.label} file`}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   {isLoading && msg.role === 'assistant' && !msg.content ? (
                     <div className="flex items-center gap-1.5 py-4"><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse" /><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-75" /><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-150" /></div>
                   ) : editingId === msg.id ? (

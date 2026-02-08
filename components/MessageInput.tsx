@@ -301,12 +301,35 @@ const MessageInput: React.FC<MessageInputProps> = ({
         const arrayBuffer = await file.arrayBuffer();
         const zip = await JSZip.loadAsync(arrayBuffer);
         let zipContent = `ZIP Archive: ${file.name}\n`;
-        // Fix: Cast Object.entries(zip.files) to any to fix TypeScript "unknown" property errors for .dir and .async
-        for (const [filename, zipFile] of Object.entries(zip.files) as [string, any][]) {
-          if (!zipFile.dir) {
-            const text = await zipFile.async('text');
-            zipContent += `\n--- File: ${filename} ---\n${text.slice(0, 5000)}\n`;
+        // Only read text-based files, skip binaries
+        const textExtensions = new Set(['txt','md','json','csv','xml','html','htm','css','js','ts','tsx','jsx','py','java','c','cpp','h','rb','go','rs','sh','bat','yml','yaml','toml','ini','cfg','conf','env','log','sql','graphql','prisma','svelte','vue','php','swift','kt','scala','r','lua','pl','ps1','dockerfile','makefile','gitignore','editorconfig']);
+        const entries = Object.entries(zip.files) as [string, any][];
+        let fileCount = 0;
+        const MAX_FILES = 30;
+        const MAX_FILE_SIZE = 10000; // chars per file
+        
+        for (const [filename, zipFile] of entries) {
+          if (zipFile.dir) continue;
+          if (fileCount >= MAX_FILES) {
+            zipContent += `\n... (${entries.length - fileCount} more files not shown)\n`;
+            break;
           }
+          const fileExt = filename.split('.').pop()?.toLowerCase() || '';
+          const baseName = filename.split('/').pop()?.toLowerCase() || '';
+          // Skip binary files and hidden files
+          if (!textExtensions.has(fileExt) && !textExtensions.has(baseName)) {
+            zipContent += `\n--- File: ${filename} --- [binary, skipped]\n`;
+            fileCount++;
+            continue;
+          }
+          try {
+            const text = await zipFile.async('text');
+            zipContent += `\n--- File: ${filename} ---\n${text.slice(0, MAX_FILE_SIZE)}\n`;
+            if (text.length > MAX_FILE_SIZE) zipContent += `... (truncated, ${text.length} chars total)\n`;
+          } catch {
+            zipContent += `\n--- File: ${filename} --- [could not read]\n`;
+          }
+          fileCount++;
         }
         content = zipContent;
       } else {
@@ -504,6 +527,52 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
             )}
             {attachedDocs.map((doc, i) => {
               const info = getFileInfo(doc.title);
+              const isZip = doc.title.toLowerCase().endsWith('.zip');
+              
+              if (isZip) {
+                // Count files from the extracted content
+                const fileMatches = doc.content.match(/--- File: /g);
+                const totalFiles = fileMatches ? fileMatches.length : 0;
+                // Extract first few filenames for preview
+                const fileNames = [...doc.content.matchAll(/--- File: (.+?) ---/g)].slice(0, 4).map(m => m[1].split('/').pop());
+                
+                return (
+                  <div key={i} className="relative group w-52">
+                    <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl overflow-hidden">
+                      {/* ZIP header */}
+                      <div className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 border-b border-[var(--border)]">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-orange-500/20 text-orange-400">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{doc.title}</p>
+                          <p className="text-[10px] text-orange-400 font-medium">{totalFiles} file{totalFiles !== 1 ? 's' : ''} extracted</p>
+                        </div>
+                      </div>
+                      {/* File listing preview */}
+                      <div className="px-3 py-1.5 space-y-0.5">
+                        {fileNames.map((name, j) => (
+                          <div key={j} className="flex items-center gap-1.5">
+                            <div className="w-1 h-1 rounded-full bg-[var(--text-secondary)]/40 flex-shrink-0" />
+                            <span className="text-[10px] text-[var(--text-secondary)] truncate">{name}</span>
+                          </div>
+                        ))}
+                        {totalFiles > 4 && (
+                          <p className="text-[9px] text-[var(--text-secondary)]/60 pl-2.5">+{totalFiles - 4} more</p>
+                        )}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => removeDoc(i)} 
+                      aria-label="Remove document" 
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 hover:text-white hover:border-red-500"
+                    >
+                      <Icons.X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                );
+              }
+              
               return (
                 <div key={i} className="relative group flex items-center gap-2.5 px-3 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl min-w-[140px] max-w-[200px]">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${info.color}`}>
