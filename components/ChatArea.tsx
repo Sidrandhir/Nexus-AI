@@ -3,6 +3,8 @@ import { Message, AIModel, RouterResult, ChatSession, GroundingChunk } from '../
 import { Icons } from '../constants';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/github-dark.css';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
   BarChart, Bar, LineChart, Line 
@@ -110,23 +112,37 @@ const EnhancedChart = ({ dataStr }: { dataStr: string }) => {
 const CodeBlock = ({ children, className }: { children?: React.ReactNode; className?: string }) => {
   const [copied, setCopied] = useState(false);
   const codeRef = useRef<HTMLElement>(null);
-  if (className === 'language-chart') return <EnhancedChart dataStr={children?.toString() || ''} />;
+  const language = className?.replace('language-', '') || '';
+  const codeString = String(children).replace(/\n$/, '');
+  if (className === 'language-chart') return <EnhancedChart dataStr={codeString} />;
+
   const handleCopy = () => {
-    const code = codeRef.current?.innerText || "";
-    navigator.clipboard.writeText(code);
+    navigator.clipboard.writeText(codeString);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  let highlightedHtml: string;
+  try {
+    if (language && hljs.getLanguage(language)) {
+      highlightedHtml = hljs.highlight(codeString, { language }).value;
+    } else {
+      highlightedHtml = hljs.highlightAuto(codeString).value;
+    }
+  } catch {
+    highlightedHtml = codeString;
+  }
+
   return (
     <div className="relative group/code my-6 border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--code-bg)] shadow-sm max-w-full transition-all hover:border-[var(--text-secondary)]/20">
       <div className="flex items-center justify-between px-4 py-2 bg-[var(--code-header)] border-b border-[var(--border)]">
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-50">{className?.replace('language-', '') || 'SOURCE'}</span>
+        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-50">{language || 'SOURCE'}</span>
         <button onClick={handleCopy} className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${copied ? 'text-emerald-500' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
           {copied ? <Icons.Check className="w-3 h-3" /> : <Icons.Copy className="w-3 h-3" />}
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <pre className="overflow-x-auto custom-scrollbar leading-relaxed"><code ref={codeRef} className={`${className} block p-5 w-fit min-w-full text-[var(--text-primary)] text-[0.85rem]`}>{children}</code></pre>
+      <pre className="overflow-x-auto custom-scrollbar leading-relaxed"><code ref={codeRef} className={`hljs ${className || ''} block p-5 w-fit min-w-full text-[0.9rem]`} dangerouslySetInnerHTML={{ __html: highlightedHtml }} /></pre>
     </div>
   );
 };
@@ -232,7 +248,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                       <div className="flex gap-2"><button onClick={() => submitEdit(msg.id)} className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-[var(--accent)]/10">Update</button><button onClick={() => setEditingId(null)} className="px-5 py-2.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] rounded-xl text-[10px] font-black uppercase tracking-widest border border-[var(--border)] active:scale-95 transition-all">Cancel</button></div>
                     </div>
                   ) : (
-                    <div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ table: EnhancedTable, code: ({ node, inline, className, children, ...props }: any) => { return !inline ? (<CodeBlock className={className} children={children} />) : (<code className={className} {...props}>{children}</code>); } }}>{msg.content}</ReactMarkdown></div>
+                    <div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ table: EnhancedTable, p: ({ children }) => <div className="mb-4 leading-relaxed">{children}</div>, code: ({ node, inline, className, children, ...props }: any) => { return !inline ? (<CodeBlock className={className} children={children} />) : (<code className={`${className || ''} text-[var(--accent)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-md text-[0.9em] font-semibold border border-[var(--border)]`} {...props}>{children}</code>); } }}>{msg.content}</ReactMarkdown></div>
                   )}
                   {msg.image && <div className="mt-8 rounded-xl overflow-hidden border border-[var(--border)] shadow-xl"><img src={`data:${msg.image.mimeType};base64,${msg.image.inlineData.data}`} alt="Context Attached" className="max-w-full h-auto" /></div>}
                   {msg.groundingChunks && msg.groundingChunks.length > 0 && (

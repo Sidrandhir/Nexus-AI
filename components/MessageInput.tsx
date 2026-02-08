@@ -41,6 +41,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const attachMenuRef = useRef<HTMLDivElement>(null);
@@ -361,7 +362,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Mobile: Enter = newline (user taps Send button). Desktop: Enter = send, Shift+Enter = newline.
+    const isMobile = window.innerWidth < 768;
+    if (e.key === 'Enter' && !e.shiftKey && !isMobile) {
       e.preventDefault();
       handleSubmit();
     }
@@ -469,6 +472,15 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
         onChange={handleFileChange}
         aria-label="Attach image"
       />
+      <input 
+        type="file" 
+        ref={cameraInputRef} 
+        className="hidden" 
+        accept="image/*" 
+        capture="environment"
+        onChange={handleFileChange}
+        aria-label="Take photo"
+      />
 
       {/* Main input container - ChatGPT style */}
       <div className="max-w-3xl mx-auto bg-[var(--bg-tertiary)]/40 rounded-2xl sm:rounded-3xl border border-[var(--border)] focus-within:border-[var(--text-secondary)]/30 transition-all shadow-xl relative">
@@ -553,6 +565,16 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
                   <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
                 </svg>
                 Upload image
+              </button>
+              <button
+                onClick={() => { cameraInputRef.current?.click(); setShowAttachMenu(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left sm:hidden"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5 text-[var(--text-secondary)]">
+                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" />
+                  <circle cx="12" cy="13" r="3" />
+                </svg>
+                Camera
               </button>
               <button
                 onClick={() => { fileInputRef.current?.click(); }}

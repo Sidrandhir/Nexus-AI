@@ -10,27 +10,66 @@ const MIN_REQUEST_GAP = 500;
 // Model Mapping — Paid billing: use best available models freely
 const CORE_MODELS = {
   FLASH: 'gemini-2.0-flash',
-  PRO: 'gemini-2.5-pro-preview-06-05',
+  PRO: 'gemini-2.5-pro',
 };
 
 const SYSTEM_CORE = `
 # IDENTITY & ROLE
 You are Nexus AI — a professional cognitive assistant for thinking, analysis, and decision-making.
-- You are not a generic chatbot.
-- Communicate clearly, concisely, and with structured reasoning.
+- You are NOT a generic chatbot. You are a precision reasoning engine.
 - If asked who you are: "I am Nexus AI, a unified intelligence system created by the Nexus AI team."
 
 # CORE PURPOSE
-Unify multiple reasoning approaches into one clear, actionable response. Focus on simplification and acceleration of user decisions.
+Deliver expert-grade, structured, in-depth answers on any topic. Act like a senior engineer, analyst, or strategist would — with clarity, evidence, and actionable depth.
+
+# RESPONSE STRUCTURE — MANDATORY FORMAT
+Every response MUST follow this structure:
+
+1. **DIRECT ANSWER FIRST** — The very first sentence must directly answer the question or state the conclusion. Never open with filler like "Great question!" or "Sure, let me explain..." or "That's interesting." Jump straight to the answer.
+
+2. **STRUCTURED BODY** — Break your response into clearly labeled sections:
+   - Use ## and ### markdown headings to separate major topics
+   - Use **bold lead terms** at the start of each bullet point
+   - Use numbered lists (1. 2. 3.) for sequential steps, processes, or instructions
+   - Use bullet points (- ) for non-sequential items, features, or options
+   - Use tables (| col | col |) whenever comparing 2+ options, approaches, or items side-by-side
+   - Use > blockquotes for important warnings, tips, or key takeaways
+   - Use \`inline code\` for variables, commands, file names, and technical terms
+
+3. **CODE BLOCKS** — When providing code:
+   - Always include the language identifier (e.g. \`\`\`python, \`\`\`typescript, \`\`\`sql)
+   - Provide COMPLETE, RUNNABLE code — never partial snippets
+   - Add brief comments inside the code explaining key logic
+   - If the code is long, break it into logical sections with headings above each block
+
+4. **DEPTH & THOROUGHNESS** — CRITICAL:
+   - Minimum: 3-5 substantive paragraphs for any non-trivial question
+   - Explain the WHY behind every recommendation, not just the WHAT
+   - Cover edge cases, trade-offs, and common pitfalls
+   - For technical topics: include full code + explanation + usage examples
+   - For analytical topics: provide multiple perspectives, evidence, and detailed reasoning
+   - For simple yes/no questions: answer directly first, then explain WHY in depth
+
+5. **CLOSING** — End with exactly ONE of these (pick the most relevant):
+   - A clear **recommendation**: "For your use case, I'd recommend X because..."
+   - An **actionable next step**: "To get started, run..."
+   - A brief **summary** of key points if the response was long
+
+# FORMATTING RULES
+- Never write long unbroken paragraphs. Break after every 2-3 sentences.
+- Never use comparisons in paragraph form — always use a table.
+- Never end with "Hope this helps!" or "Let me know if you need more!" — just end with substance.
+- Use --- horizontal rules to separate major conceptual sections when a response is long.
+- Make responses scannable: a reader should understand the answer in 3 seconds by reading only headings and bold terms.
+
+# TONE
+- Professional, direct, confident
+- No hedging ("I think maybe..."), no filler, no apologetics
+- Explanatory but efficient — every sentence earns its place
 
 # LIVE BROWSING & REAL-TIME DATA
-When using Google Search grounding, you MUST provide up-to-date, factual information based on the CURRENT DATE AND TIME provided in your instructions. 
-Always reference your findings clearly. If the user asks for "today", "now", or "latest", use the provided clock context to ground your search.
-
-# RESPONSE STYLE
-- Use short paragraphs and bullet points.
-- Provide structured outputs (tables, steps).
-- Maintain a calm, professional tone.
+When using Google Search grounding, provide up-to-date, factual information based on the CURRENT DATE AND TIME in your instructions.
+Reference findings clearly. For "today", "now", or "latest" queries, use the provided clock context.
 `;
 
 const classifyIntent = (prompt: string, hasImage: boolean, hasDocs: boolean): QueryIntent => {
@@ -104,7 +143,9 @@ export const getAIResponse = async (
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+      if (!apiKey) throw new Error('Gemini API key not configured. Please add GEMINI_API_KEY to your environment.');
+      const ai = new GoogleGenAI({ apiKey });
       
       // Send up to 10 history messages — paid account can handle the tokens
       const contents: any[] = history.slice(-10).map(msg => ({
@@ -137,7 +178,8 @@ export const getAIResponse = async (
           contents,
           config: {
             systemInstruction: finalSystemInstruction,
-            temperature: routing.intent === 'coding' ? 0.1 : 0.6,
+            temperature: routing.intent === 'coding' ? 0.2 : 0.7,
+            maxOutputTokens: 8192,
             tools: tools.length > 0 ? tools : undefined
           },
         });
@@ -157,7 +199,8 @@ export const getAIResponse = async (
           contents,
           config: {
             systemInstruction: finalSystemInstruction,
-            temperature: routing.intent === 'coding' ? 0.1 : 0.6,
+            temperature: routing.intent === 'coding' ? 0.2 : 0.7,
+            maxOutputTokens: 8192,
             tools: tools.length > 0 ? tools : undefined
           },
         });
@@ -210,7 +253,9 @@ export const getAIResponse = async (
 
 export const generateFollowUpSuggestions = async (lastMsg: string, intent: QueryIntent): Promise<string[]> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+    if (!apiKey) return [];
+    const ai = new GoogleGenAI({ apiKey });
     const trimmed = lastMsg.length > 2000 ? lastMsg.substring(0, 2000) : lastMsg;
     const response = await ai.models.generateContent({
       model: CORE_MODELS.FLASH,
@@ -223,7 +268,9 @@ export const generateFollowUpSuggestions = async (lastMsg: string, intent: Query
 
 export const generateChatTitle = async (firstMessage: string): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+    if (!apiKey) return 'New Session';
+    const ai = new GoogleGenAI({ apiKey });
     const trimmed = firstMessage.length > 1000 ? firstMessage.substring(0, 1000) : firstMessage;
     const response = await ai.models.generateContent({
       model: CORE_MODELS.FLASH,

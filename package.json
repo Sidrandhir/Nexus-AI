@@ -13,6 +13,7 @@
     "@stripe/stripe-js": "^3.0.0",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.13.4",
+    "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
     "mammoth": "^1.6.0",
     "pdfjs-dist": "4.4.168",

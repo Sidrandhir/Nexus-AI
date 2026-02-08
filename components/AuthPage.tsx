@@ -166,10 +166,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
               <button 
                 onClick={handleGoogleAuth}
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-3 py-2.5 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors active:scale-[0.98] disabled:opacity-50 touch-manipulation"
+                className="w-full flex items-center justify-center gap-3 py-3 bg-white text-gray-800 font-semibold border-2 border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 hover:shadow-lg hover:shadow-emerald-500/10 transition-all active:scale-[0.98] disabled:opacity-50 touch-manipulation shadow-md"
               >
                 <Icons.Google className="w-[18px] h-[18px]" />
-                <span className="text-sm font-medium text-[var(--text-primary)]">Continue with Google</span>
+                <span className="text-sm font-semibold text-gray-800">Continue with Google</span>
               </button>
 
               {/* Divider */}
