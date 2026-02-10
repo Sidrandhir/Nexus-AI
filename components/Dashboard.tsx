@@ -26,7 +26,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onUpgrade }) => {
           {stats.tier === 'free' && (
             <button 
               onClick={onUpgrade}
-              className="bg-emerald-500 hover:brightness-110 text-white px-6 sm:px-10 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-emerald-500/20 active:scale-95 w-full sm:w-auto"
+              className="bg-emerald-500 hover:brightness-110 text-white px-6 sm:px-10 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-[12px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-emerald-500/20 active:scale-95 w-full sm:w-auto"
             >
               Upgrade to Pro
             </button>
@@ -37,10 +37,10 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onUpgrade }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
           <div className="bg-[var(--bg-tertiary)]/20 p-5 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-[var(--border)] relative group overflow-hidden">
             <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-2 relative z-10">Messages This Month</p>
+            <p className="text-[12px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-2 relative z-10">Messages This Month</p>
             <div className="flex items-baseline gap-2 relative z-10">
               <p className="text-3xl sm:text-5xl font-black text-[var(--text-primary)]">{stats.monthlyMessagesSent}</p>
-              <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase">/ 50</span>
+              <span className="text-[12px] font-black text-[var(--text-secondary)] uppercase">/ 50</span>
             </div>
             <div className="mt-4 sm:mt-6 md:mt-8 w-full bg-white/5 rounded-full h-1 overflow-hidden relative z-10">
               <div 
@@ -52,16 +52,16 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onUpgrade }) => {
 
           <div className="bg-[var(--bg-tertiary)]/20 p-5 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-[var(--border)] relative group">
              <div className="absolute inset-0 bg-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-2 relative z-10">Tokens Used</p>
+            <p className="text-[12px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-2 relative z-10">Tokens Used</p>
             <p className="text-3xl sm:text-5xl font-black text-[var(--text-primary)] relative z-10">{(stats.tokensEstimated / 1000).toFixed(1)}k</p>
-            <p className="text-[9px] text-[var(--text-secondary)] mt-4 uppercase font-black tracking-wider relative z-10">Total tokens</p>
+            <p className="text-[12px] text-[var(--text-secondary)] mt-4 uppercase font-black tracking-wider relative z-10">Total tokens</p>
           </div>
 
           <div className="bg-[var(--bg-tertiary)]/20 p-5 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-[var(--border)] sm:col-span-2 md:col-span-2 relative group">
             <div className="absolute inset-0 bg-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="flex justify-between items-start relative z-10">
               <div className="space-y-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Most Used Model</p>
+                <p className="text-[12px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Most Used Model</p>
                 <p className="text-2xl sm:text-3xl font-black truncate text-emerald-500 uppercase italic tracking-tighter">{favoriteModel.split(' ').pop()}</p>
               </div>
               <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/5">
@@ -84,13 +84,13 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onUpgrade }) => {
           {/* Main Activity Chart */}
           <div className="lg:col-span-2 bg-[var(--bg-tertiary)]/10 p-5 sm:p-8 md:p-10 rounded-2xl sm:rounded-[3rem] border border-[var(--border)]">
             <div className="flex justify-between items-center mb-6 sm:mb-8 md:mb-12">
-               <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-secondary)]">Daily Activity</h3>
+               <h3 className="text-[12px] font-black uppercase tracking-[0.3em] text-[var(--text-secondary)]">Daily Activity</h3>
 
             </div>
             
             <div className="flex items-end gap-1 sm:gap-1.5 h-40 sm:h-52 md:h-64">
               {stats.dailyHistory.length === 0 ? (
-                <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] uppercase tracking-widest font-black text-[9px] opacity-20">No activity yet</div>
+                <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] uppercase tracking-widest font-black text-[12px] opacity-20">No activity yet</div>
               ) : (
                 stats.dailyHistory.map((day, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center group relative">
@@ -100,7 +100,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onUpgrade }) => {
                     >
                        <div className="absolute inset-0 border-t border-white/10" />
                     </div>
-                    <div className="absolute bottom-full mb-4 bg-[var(--bg-secondary)] text-white text-[9px] font-black px-4 py-2 rounded-xl border border-[var(--border)] opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 whitespace-nowrap z-20 shadow-2xl uppercase tracking-widest">
+                    <div className="absolute bottom-full mb-4 bg-[var(--bg-secondary)] text-white text-[12px] font-black px-4 py-2 rounded-xl border border-[var(--border)] opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 whitespace-nowrap z-20 shadow-2xl uppercase tracking-widest">
                       {day.date}: {day.count} messages
                     </div>
                   </div>
@@ -119,15 +119,15 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onUpgrade }) => {
              
              <div className="space-y-4 sm:space-y-6 mt-6 sm:mt-0">
                 <div className="p-4 sm:p-6 bg-white/10 rounded-2xl sm:rounded-3xl border border-white/10">
-                   <p className="text-[9px] font-black uppercase mb-1">Uptime</p>
+                   <p className="text-[12px] font-black uppercase mb-1">Uptime</p>
                    <p className="text-lg sm:text-xl font-black uppercase italic">99.8%</p>
                 </div>
                 {stats.tier === 'free' ? (
-                  <button onClick={onUpgrade} className="w-full py-4 bg-[#0d0d0d] text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:scale-105 transition-all">
+                  <button onClick={onUpgrade} className="w-full py-4 bg-[#0d0d0d] text-white text-[12px] font-black uppercase tracking-[0.2em] rounded-2xl hover:scale-105 transition-all">
                     Unlock Unlimited
                   </button>
                 ) : (
-                  <div className="text-center py-4 text-[10px] font-black uppercase tracking-widest opacity-40">Pro Subscribed</div>
+                  <div className="text-center py-4 text-[12px] font-black uppercase tracking-widest opacity-40">Pro Subscribed</div>
                 )}
              </div>
           </div>

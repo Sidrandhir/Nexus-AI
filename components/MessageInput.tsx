@@ -495,7 +495,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
             ref={buttonRef}
             disabled={isDisabled}
             onClick={handleToggleDropdown}
-            className={`flex items-center gap-2 px-3 py-1.5 text-[10px] sm:text-[11px] font-bold rounded-full border shadow-sm transition-all ${modelColors[preferredModel]} ${isDisabled ? 'opacity-50' : 'hover:brightness-110 active:scale-95'}`}
+            className={`flex items-center gap-2 px-3 py-1.5 text-[12px] sm:text-[13px] font-semibold rounded-full border shadow-sm transition-all ${modelColors[preferredModel]} ${isDisabled ? 'opacity-50' : 'hover:brightness-110 active:scale-95'}`}
           >
             <Icons.Robot className="w-3.5 h-3.5" />
             {modelExpertise[preferredModel].label}
@@ -519,9 +519,9 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
               <button 
                 onMouseEnter={() => setHoveredModel('auto')}
                 onClick={() => { onModelChange?.('auto'); setShowModelDropdown(false); }} 
-                className={`w-full text-left px-4 py-3 text-xs transition-colors ${preferredModel === 'auto' ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'}`}
+                className={`w-full text-left px-4 py-3 text-[13px] transition-colors ${preferredModel === 'auto' ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'}`}
               >
-                <div className="font-bold tracking-tight flex items-center gap-2"><span className="text-sm">✨</span>Auto</div>
+                <div className="font-semibold tracking-tight flex items-center gap-2"><span className="text-sm">✨</span>Auto</div>
               </button>
               {[
                 { m: AIModel.GPT4, l: "Reasoning & Planning", icon: "🧠" },
@@ -532,18 +532,18 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
                   key={m} 
                   onMouseEnter={() => setHoveredModel(m)}
                   onClick={() => { onModelChange?.(m); setShowModelDropdown(false); }} 
-                  className={`w-full text-left px-4 py-3 text-xs transition-colors ${preferredModel === m ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'}`}
+                  className={`w-full text-left px-4 py-3 text-[13px] transition-colors ${preferredModel === m ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'}`}
                 >
-                  <div className="font-bold tracking-tight flex items-center gap-2"><span className="text-sm">{icon}</span>{l}</div>
+                  <div className="font-semibold tracking-tight flex items-center gap-2"><span className="text-sm">{icon}</span>{l}</div>
                 </button>
               ))}
             </div>
             <div className="flex-1 p-4 bg-[var(--bg-tertiary)]/30 min-h-[160px] flex flex-col justify-center">
               {hoveredModel ? (
                 <div>
-                  <p className="text-[10px] font-black text-[var(--accent)] mb-1.5 uppercase tracking-tight leading-tight">{modelExpertise[hoveredModel].expertise}</p>
-                  <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed opacity-80 mb-3">{modelExpertise[hoveredModel].detail}</p>
-                  <p className="text-[9px] text-[var(--text-secondary)]/60 leading-relaxed italic">{modelExpertise[hoveredModel].examples}</p>
+                  <p className="text-[12px] sm:text-[13px] font-bold text-[var(--accent)] mb-1.5 tracking-tight leading-tight">{modelExpertise[hoveredModel].expertise}</p>
+                  <p className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] leading-relaxed opacity-80 mb-3">{modelExpertise[hoveredModel].detail}</p>
+                  <p className="text-[11px] sm:text-[12px] text-[var(--text-secondary)]/60 leading-relaxed italic">{modelExpertise[hoveredModel].examples}</p>
                 </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center opacity-20">
@@ -629,8 +629,8 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{doc.title}</p>
-                          <p className="text-[10px] text-orange-400 font-medium">{totalFiles} file{totalFiles !== 1 ? 's' : ''} extracted</p>
+                          <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{doc.title}</p>
+                          <p className="text-[12px] text-orange-400 font-medium">{totalFiles} file{totalFiles !== 1 ? 's' : ''} extracted</p>
                         </div>
                       </div>
                       {/* File listing preview */}
@@ -638,11 +638,11 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
                         {fileNames.map((name, j) => (
                           <div key={j} className="flex items-center gap-1.5">
                             <div className="w-1 h-1 rounded-full bg-[var(--text-secondary)]/40 flex-shrink-0" />
-                            <span className="text-[10px] text-[var(--text-secondary)] truncate">{name}</span>
+                            <span className="text-[12px] text-[var(--text-secondary)] truncate">{name}</span>
                           </div>
                         ))}
                         {totalFiles > 4 && (
-                          <p className="text-[9px] text-[var(--text-secondary)]/60 pl-2.5">+{totalFiles - 4} more</p>
+                          <p className="text-[11px] text-[var(--text-secondary)]/60 pl-2.5">+{totalFiles - 4} more</p>
                         )}
                       </div>
                     </div>
@@ -660,11 +660,11 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
               return (
                 <div key={i} className="relative group flex items-center gap-2.5 px-3 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl min-w-[140px] max-w-[200px]">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${info.color}`}>
-                    <span className="text-[8px] font-black uppercase">{info.label}</span>
+                    <span className="text-[11px] font-black uppercase">{info.label}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-[var(--text-primary)] truncate">{doc.title}</p>
-                    <p className="text-[10px] text-[var(--text-secondary)]">{info.label} file</p>
+                    <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">{doc.title}</p>
+                    <p className="text-[12px] text-[var(--text-secondary)]">{info.label} file</p>
                   </div>
                   <button 
                     onClick={() => removeDoc(i)} 
@@ -710,7 +710,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
             >
               <button
                 onClick={() => { imageInputRef.current?.click(); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[14px] sm:text-[15px] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5 text-[var(--text-secondary)]">
                   <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
@@ -721,7 +721,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
               </button>
               <button
                 onClick={() => { cameraInputRef.current?.click(); setShowAttachMenu(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left sm:hidden"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[14px] sm:text-[15px] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left sm:hidden"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5 text-[var(--text-secondary)]">
                   <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" />
@@ -731,7 +731,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
               </button>
               <button
                 onClick={() => { fileInputRef.current?.click(); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[14px] sm:text-[15px] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5 text-[var(--text-secondary)]">
                   <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
@@ -753,7 +753,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
             disabled={isDisabled}
             rows={1}
             aria-label="Chat message input"
-            className="flex-1 bg-transparent text-[var(--text-primary)] py-2.5 sm:py-3 px-1 sm:px-2 focus:outline-none resize-none transition-all placeholder:text-[var(--text-secondary)]/40 text-sm sm:text-base leading-relaxed overflow-hidden overflow-y-auto"
+            className="flex-1 bg-transparent text-[var(--text-primary)] py-2.5 sm:py-3 px-1 sm:px-2 focus:outline-none resize-none transition-all placeholder:text-[var(--text-secondary)]/40 text-[15px] sm:text-base leading-relaxed overflow-hidden overflow-y-auto"
           />
 
           {/* Right side buttons */}
@@ -798,7 +798,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
           </div>
         </div>
       </div>
-      <p className="text-center text-[10px] sm:text-[11px] text-[var(--text-secondary)]/50 mt-2 max-w-3xl mx-auto leading-relaxed">
+      <p className="text-center text-[12px] sm:text-[13px] text-[var(--text-secondary)]/50 mt-2 max-w-3xl mx-auto leading-relaxed">
         Nexus AI may generate imperfect outputs. Always verify critical information.
       </p>
     </div>

@@ -105,7 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div 
         key={session.id}
         onClick={() => !isConfirming && handleSessionClick(session.id)}
-        className={`group relative flex items-center w-full p-3 sm:p-2.5 rounded-xl text-sm transition-all cursor-pointer ${
+        className={`group relative flex items-center w-full p-3 sm:p-2.5 rounded-xl text-[14px] sm:text-[13px] transition-all cursor-pointer ${
           isActive ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-md border border-[var(--border)]' : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/50'
         } ${isConfirming ? 'border-red-500/50 bg-red-500/5' : ''}`}
       >
@@ -114,7 +114,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             autoFocus
             aria-label="Edit chat session title"
             placeholder="Enter session title"
-            className="w-full bg-transparent border-none outline-none focus:ring-0 p-0 text-[var(--text-primary)] text-xs font-bold"
+            className="w-full bg-transparent border-none outline-none focus:ring-0 p-0 text-[var(--text-primary)] text-[13px] font-medium"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={() => saveEdit(session.id)}
@@ -167,7 +167,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg">
                   <Icons.Robot className="w-5 h-5 text-white" />
                 </div>
-                <h1 className="text-sm font-black tracking-tighter text-[var(--text-primary)] uppercase">NEXUS AI</h1>
+                <h1 className="text-[14px] font-black tracking-tight text-[var(--text-primary)] uppercase">NEXUS AI</h1>
               </div>
             )}
             <button 
@@ -183,10 +183,10 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button 
             onClick={() => { onNewChat(); onSetView('chat'); if (window.innerWidth < 640) onToggle(); }} 
             {...(!isOpen ? { 'data-nexus-tooltip': 'New chat' } : {})}
-            className={`flex items-center gap-3 p-3.5 rounded-2xl border border-[var(--border)] hover:bg-[var(--bg-tertiary)] transition-all text-sm font-bold ${isOpen ? 'w-full' : 'w-10 h-10 p-0 justify-center mx-auto'}`}
+            className={`flex items-center gap-3 p-3.5 rounded-2xl border border-[var(--border)] hover:bg-[var(--bg-tertiary)] transition-all text-[14px] sm:text-[13px] font-semibold ${isOpen ? 'w-full' : 'w-10 h-10 p-0 justify-center mx-auto'}`}
           >
             <Icons.Plus />
-            {isOpen && <span className="truncate uppercase tracking-widest text-[10px]">New Chat</span>}
+            {isOpen && <span className="truncate uppercase tracking-widest text-[12px] sm:text-[11px]">New Chat</span>}
           </button>
         </div>
 
@@ -200,7 +200,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 placeholder="Search chats..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl py-3 pl-10 pr-4 text-[10px] font-bold uppercase outline-none focus:border-emerald-500/50"
+                className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl py-3 pl-10 pr-4 text-[13px] font-medium outline-none focus:border-emerald-500/50"
               />
             </div>
           </div>
@@ -222,9 +222,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4 mt-auto border-t border-[var(--border)] space-y-4 pb-safe">
           {isOpen && user.tier === 'free' && (
             <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
-              <h4 className="text-[10px] font-black uppercase text-amber-500 tracking-widest mb-1">Nexus Pro</h4>
-              <p className="text-[9px] text-[var(--text-secondary)] mb-3">Get unlimited messages.</p>
-              <button onClick={() => { onSetView('pricing'); if (window.innerWidth < 640) onToggle(); }} className="w-full py-2.5 bg-amber-500 text-white text-[9px] font-black uppercase rounded-lg active:scale-95 transition-transform">Upgrade Now</button>
+              <h4 className="text-[12px] font-bold text-amber-500 tracking-wide mb-1">Nexus Pro</h4>
+              <p className="text-[12px] text-[var(--text-secondary)] mb-3">Get unlimited messages.</p>
+              <button onClick={() => { onSetView('pricing'); if (window.innerWidth < 640) onToggle(); }} className="w-full py-2.5 bg-amber-500 text-white text-[12px] font-bold rounded-lg active:scale-95 transition-transform">Upgrade Now</button>
             </div>
           )}
 
@@ -233,13 +233,13 @@ const Sidebar: React.FC<SidebarProps> = ({
             {...(!isOpen ? { 'data-nexus-tooltip': 'Settings' } : {})}
             className={`flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--bg-tertiary)] transition-all ${isOpen ? 'w-full' : 'w-10 h-10 p-0 justify-center mx-auto'}`}
           >
-            <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center text-[11px] font-black text-white flex-shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center text-[13px] font-bold text-white flex-shrink-0">
               {user.email.charAt(0).toUpperCase()}
             </div>
             {isOpen && (
               <div className="flex-1 text-left min-w-0">
-                <p className="font-bold truncate text-[11px]">{user.email.split('@')[0]}</p>
-                <p className="text-[9px] font-black uppercase text-emerald-500">{user.tier}</p>
+                <p className="font-semibold truncate text-[13px]">{user.email.split('@')[0]}</p>
+                <p className="text-[11px] font-bold text-emerald-500">{user.tier}</p>
               </div>
             )}
           </button>

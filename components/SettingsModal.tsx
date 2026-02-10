@@ -103,7 +103,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         setActiveTab(id);
         setShowPurgeConfirm(false);
       }}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[12px] font-black uppercase tracking-widest transition-all ${
         activeTab === id 
           ? 'bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/20' 
           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
@@ -138,7 +138,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="mt-auto">
              <button 
                onClick={onLogout} 
-               className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/10 transition-all active:scale-95"
+               className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[12px] sm:text-[13px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/10 transition-all active:scale-95"
              >
                 <Icons.LogOut className="w-3.5 sm:w-4 h-3.5 sm:h-4 flex-shrink-0" /> Log Out
              </button>
@@ -155,7 +155,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   setActiveTab(tab);
                   setShowPurgeConfirm(false);
                 }}
-                className={`whitespace-nowrap flex-shrink-0 px-3 py-2 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all ${
+                className={`whitespace-nowrap flex-shrink-0 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all ${
                   activeTab === tab 
                     ? 'bg-[var(--accent)] text-white shadow-lg' 
                     : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
@@ -196,11 +196,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-8 bg-[var(--bg-tertiary)]/20 border border-[var(--border)] rounded-lg sm:rounded-[2rem] transition-colors">
                    <div className="space-y-1 flex-1">
                      <h4 className="font-black text-xs sm:text-sm uppercase tracking-tight text-[var(--text-primary)]">Appearance</h4>
-                     <p className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] font-medium">Switch between light and dark mode.</p>
+                     <p className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] font-medium">Switch between light and dark mode.</p>
                    </div>
                    <button 
                     onClick={onThemeToggle} 
-                    className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] shadow-sm active:scale-95 flex-shrink-0"
+                    className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg sm:rounded-xl text-[12px] sm:text-[13px] font-black uppercase tracking-widest transition-all text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] shadow-sm active:scale-95 flex-shrink-0"
                    >
                       {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
                    </button>
@@ -226,7 +226,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             {activeTab === 'personification' && (
               <div className="space-y-4 sm:space-y-8 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
                 <div className="space-y-2 sm:space-y-3">
-                  <label className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1">Custom Instructions</label>
+                  <label className="text-[11px] sm:text-[13px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1">Custom Instructions</label>
                   <textarea 
                     value={personification}
                     onChange={(e) => setPersonification(e.target.value)}
@@ -235,13 +235,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   />
                 </div>
                 <div className="space-y-3">
-                  <label className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1">Response Style</label>
+                  <label className="text-[11px] sm:text-[13px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-1">Response Style</label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
                     {['balanced', 'concise', 'detailed', 'creative'].map(style => (
                       <button 
                         key={style}
                         onClick={() => setResponseStyle(style)}
-                        className={`p-3 sm:p-5 rounded-lg sm:rounded-2xl border text-[8px] sm:text-[10px] font-black uppercase tracking-widest transition-all active:scale-[0.98] ${
+                        className={`p-3 sm:p-5 rounded-lg sm:rounded-2xl border text-[11px] sm:text-[13px] font-black uppercase tracking-widest transition-all active:scale-[0.98] ${
                           responseStyle === style 
                           ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20' 
                           : 'bg-[var(--bg-tertiary)]/20 border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)]/30'
@@ -259,9 +259,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-4 sm:space-y-8 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
                 <div className="p-6 sm:p-10 bg-gradient-to-br from-[var(--accent)]/10 to-indigo-500/10 border border-[var(--border)] rounded-lg sm:rounded-[2.5rem] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all">
                    <div className="space-y-1 sm:space-y-2 w-full">
-                     <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-[var(--accent)]">Your Plan</p>
+                     <p className="text-[11px] sm:text-[13px] font-black uppercase tracking-widest text-[var(--accent)]">Your Plan</p>
                      <h4 className="text-2xl sm:text-4xl font-black tracking-tighter uppercase text-[var(--text-primary)]">{user.tier} Membership</h4>
-                     <ul className="text-[9px] sm:text-[11px] text-[var(--text-secondary)] font-medium mt-3 sm:mt-6 space-y-2 sm:space-y-3 opacity-80">
+                     <ul className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] font-medium mt-3 sm:mt-6 space-y-2 sm:space-y-3 opacity-80">
                         <li className="flex items-center gap-2">• {user.tier === 'pro' ? 'Unlimited' : '50'} messages per month</li>
                         <li className="flex items-center gap-2">• {user.tier === 'pro' ? 'All AI Models' : 'Standard Access'}</li>
                         <li className="flex items-center gap-2">• Priority Support</li>
@@ -272,7 +272,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 {user.tier === 'free' && (
                   <button 
                     onClick={onUpgrade} 
-                    className="w-full py-3 sm:py-5 bg-[var(--accent)] text-white text-[9px] sm:text-[11px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] rounded-lg sm:rounded-2xl shadow-xl shadow-[var(--accent)]/20 active:scale-95 transition-all hover:brightness-110"
+                    className="w-full py-3 sm:py-5 bg-[var(--accent)] text-white text-[12px] sm:text-[13px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] rounded-lg sm:rounded-2xl shadow-xl shadow-[var(--accent)]/20 active:scale-95 transition-all hover:brightness-110"
                   >
                     Upgrade to Pro Plan
                   </button>
@@ -284,22 +284,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-4 sm:space-y-8 animate-in slide-in-from-bottom-2 w-full max-w-2xl">
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
                     <div className="p-4 sm:p-8 bg-[var(--bg-tertiary)]/30 rounded-lg sm:rounded-[2rem] border border-[var(--border)] flex flex-col justify-center transition-colors">
-                       <p className="text-[8px] sm:text-[10px] font-black uppercase text-[var(--text-secondary)] tracking-widest mb-2 opacity-60">Total Tokens</p>
+                       <p className="text-[11px] sm:text-[13px] font-black uppercase text-[var(--text-secondary)] tracking-widest mb-2 opacity-60">Total Tokens</p>
                        <p className="text-2xl sm:text-4xl font-black text-[var(--text-primary)] tracking-tighter">{stats?.tokensEstimated.toLocaleString() || 0}</p>
                     </div>
                     <div className="p-4 sm:p-8 bg-[var(--bg-tertiary)]/30 rounded-lg sm:rounded-[2rem] border border-[var(--border)] flex flex-col justify-center transition-colors">
-                       <p className="text-[8px] sm:text-[10px] font-black uppercase text-[var(--text-secondary)] tracking-widest mb-2 opacity-60">Total Messages</p>
+                       <p className="text-[11px] sm:text-[13px] font-black uppercase text-[var(--text-secondary)] tracking-widest mb-2 opacity-60">Total Messages</p>
                        <p className="text-2xl sm:text-4xl font-black text-[var(--text-primary)] tracking-tighter">{stats?.totalMessagesSent || 0}</p>
                     </div>
                  </div>
                  <div className="p-4 sm:p-10 bg-[var(--bg-tertiary)]/10 border border-[var(--border)] rounded-lg sm:rounded-[2.5rem] transition-colors">
-                    <h4 className="text-[8px] sm:text-[10px] font-black uppercase text-[var(--text-secondary)] tracking-widest mb-4 sm:mb-8 opacity-60">Model Usage</h4>
+                    <h4 className="text-[11px] sm:text-[13px] font-black uppercase text-[var(--text-secondary)] tracking-widest mb-4 sm:mb-8 opacity-60">Model Usage</h4>
                     <div className="space-y-4 sm:space-y-6">
                        {Object.entries(stats?.modelUsage || {}).map(([model, count]) => {
                          const percent = stats?.totalMessagesSent ? Math.round(((count as number) / stats.totalMessagesSent) * 100) : 0;
                          return (
                            <div key={model} className="space-y-2 sm:space-y-3">
-                              <div className="flex justify-between text-[8px] sm:text-[10px] font-black uppercase tracking-tight">
+                              <div className="flex justify-between text-[11px] sm:text-[13px] font-black uppercase tracking-tight">
                                  <span className="text-[var(--text-primary)] truncate">{model}</span>
                                  <span className="text-[var(--text-secondary)] whitespace-nowrap ml-2">{percent}%</span>
                               </div>
@@ -322,7 +322,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 >
                    <div className="text-left flex-1 min-w-0">
                       <h4 className="font-black text-xs sm:text-sm uppercase tracking-tight text-[var(--text-primary)]">Export Chat History</h4>
-                      <p className="text-[9px] sm:text-[11px] text-[var(--text-secondary)] font-medium opacity-60 line-clamp-2">Download your conversations as JSON or CSV.</p>
+                      <p className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] font-medium opacity-60 line-clamp-2">Download your conversations as JSON or CSV.</p>
                    </div>
                    <Icons.Download className="w-5 sm:w-6 h-5 sm:h-6 text-[var(--text-secondary)] opacity-40 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                 </button>
@@ -330,11 +330,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div className="space-y-1 flex-1 min-w-0">
                         <h4 className={`font-black text-xs sm:text-sm uppercase tracking-tight ${showPurgeConfirm ? 'text-red-500' : 'text-[var(--text-primary)]'}`}>Delete All Data</h4>
-                        <p className="text-[9px] sm:text-[11px] text-[var(--text-secondary)] font-medium opacity-60">Permanently delete all your conversations.</p>
+                        <p className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] font-medium opacity-60">Permanently delete all your conversations.</p>
                       </div>
                       <button 
                         onClick={() => setShowPurgeConfirm(!showPurgeConfirm)} 
-                        className={`px-4 sm:px-8 py-2 sm:py-3 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] font-black uppercase transition-all active:scale-95 whitespace-nowrap flex-shrink-0 ${showPurgeConfirm ? 'bg-red-500 text-white' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
+                        className={`px-4 sm:px-8 py-2 sm:py-3 rounded-lg sm:rounded-xl text-[11px] sm:text-[13px] font-black uppercase transition-all active:scale-95 whitespace-nowrap flex-shrink-0 ${showPurgeConfirm ? 'bg-red-500 text-white' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
                       >
                         {showPurgeConfirm ? 'Cancel' : 'Delete Data'}
                       </button>
@@ -344,13 +344,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         <button 
                           disabled={isPurging} 
                           onClick={handlePurge} 
-                          className="flex-1 py-3 sm:py-4 bg-red-600 text-white rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-transform disabled:opacity-50"
+                          className="flex-1 py-3 sm:py-4 bg-red-600 text-white rounded-lg sm:rounded-xl text-[11px] sm:text-[13px] font-black uppercase tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-transform disabled:opacity-50"
                         >
                           {isPurging ? 'Deleting...' : 'Yes, Delete Everything'}
                         </button>
                         <button 
                           onClick={() => setShowPurgeConfirm(false)} 
-                          className="px-4 sm:px-8 py-3 sm:py-4 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] font-black uppercase border border-[var(--border)] active:scale-95 transition-transform"
+                          className="px-4 sm:px-8 py-3 sm:py-4 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg sm:rounded-xl text-[11px] sm:text-[13px] font-black uppercase border border-[var(--border)] active:scale-95 transition-transform"
                         >
                           Keep Data
                         </button>
@@ -364,14 +364,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           <footer className="px-3 sm:px-10 py-3 sm:py-8 bg-[var(--bg-secondary)]/30 border-t border-[var(--border)] flex justify-end gap-2 sm:gap-4 transition-colors backdrop-blur-md flex-shrink-0 flex-wrap">
              <button 
                onClick={onClose} 
-               className="px-4 sm:px-8 py-2 sm:py-3 text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-lg sm:rounded-xl hover:bg-[var(--bg-tertiary)]/30"
+               className="px-4 sm:px-8 py-2 sm:py-3 text-[11px] sm:text-[13px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-lg sm:rounded-xl hover:bg-[var(--bg-tertiary)]/30"
              >
                Cancel
              </button>
              <button 
                onClick={handleSaveAll}
                disabled={isSaving}
-               className="px-4 sm:px-10 py-2 sm:py-3 bg-[var(--accent)] rounded-lg sm:rounded-2xl text-[8px] sm:text-[10px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] text-white shadow-xl shadow-[var(--accent)]/20 active:scale-95 transition-all hover:brightness-110 disabled:opacity-50"
+               className="px-4 sm:px-10 py-2 sm:py-3 bg-[var(--accent)] rounded-lg sm:rounded-2xl text-[11px] sm:text-[13px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] text-white shadow-xl shadow-[var(--accent)]/20 active:scale-95 transition-all hover:brightness-110 disabled:opacity-50"
              >
                {isSaving ? 'Saving...' : 'Apply'}
              </button>

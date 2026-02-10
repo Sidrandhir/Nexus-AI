@@ -26,12 +26,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ stats }) => {
           <div>
             <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold flex items-center gap-3 flex-wrap">
               Admin Dashboard
-              <span className="bg-red-500/10 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded border border-red-500/20 uppercase tracking-widest">Live</span>
+              <span className="bg-red-500/10 text-red-500 text-[12px] font-bold px-2 py-0.5 rounded border border-red-500/20 uppercase tracking-widest">Live</span>
             </h1>
 
           </div>
           <div className="text-right">
-            <p className="text-[10px] text-[#666] font-bold uppercase tracking-widest">Last Refresh</p>
+            <p className="text-[12px] text-[#666] font-bold uppercase tracking-widest">Last Refresh</p>
             <p className="text-xs font-mono">{new Date().toLocaleTimeString()}</p>
           </div>
         </div>
@@ -49,7 +49,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ stats }) => {
             <div key={i} className="bg-[#2f2f2f]/50 p-4 rounded-2xl border border-[#4a4a4a] flex flex-col justify-between">
               <span className="text-2xl mb-2">{m.icon}</span>
               <div>
-                <p className="text-[10px] text-[#8e8e93] font-bold uppercase tracking-wider mb-1">{m.label}</p>
+                <p className="text-[12px] text-[#8e8e93] font-bold uppercase tracking-wider mb-1">{m.label}</p>
                 <p className={`text-xl font-bold truncate ${m.color || ''}`}>{m.value}</p>
               </div>
             </div>
@@ -142,7 +142,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ stats }) => {
                     <tr key={log.id} className={`hover:bg-white/5 transition-colors ${log.critical ? 'text-red-400 font-medium' : 'text-[#ececec]'}`}>
                       <td className="px-6 py-4 font-mono">{new Date(log.timestamp).toLocaleTimeString()}</td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded uppercase text-[9px] font-bold ${log.critical ? 'bg-red-500 text-white' : 'bg-yellow-500/20 text-yellow-500'}`}>
+                        <span className={`px-2 py-0.5 rounded uppercase text-[12px] font-bold ${log.critical ? 'bg-red-500 text-white' : 'bg-yellow-500/20 text-yellow-500'}`}>
                           {log.critical ? 'Critical' : 'Warning'}
                         </span>
                       </td>

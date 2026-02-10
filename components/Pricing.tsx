@@ -35,20 +35,20 @@ const Pricing: React.FC<PricingProps> = ({ onUpgrade, onClose }) => {
             <h3 className="text-xl font-black text-[var(--text-primary)] mb-2">Free</h3>
             <div className="text-4xl font-black text-[var(--text-primary)] mb-6">$0<span className="text-lg font-normal text-[var(--text-secondary)]">/mo</span></div>
             <p className="text-[var(--text-secondary)] text-sm mb-8">Perfect for exploring our smart routing and multiple models.</p>
-            <button className="mt-auto w-full py-4 rounded-xl font-black text-[10px] uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] cursor-not-allowed">
+            <button className="mt-auto w-full py-4 rounded-xl font-black text-[12px] uppercase tracking-widest border border-[var(--border)] text-[var(--text-secondary)] cursor-not-allowed">
               Current Plan
             </button>
           </div>
 
           {/* Pro Tier */}
           <div className="bg-[var(--bg-tertiary)] p-5 sm:p-6 md:p-8 rounded-3xl border-2 border-[var(--accent)] flex flex-col relative overflow-hidden">
-            <div className="absolute top-4 right-4 bg-[var(--accent)] text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Recommended</div>
+            <div className="absolute top-4 right-4 bg-[var(--accent)] text-white text-[12px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Recommended</div>
             <h3 className="text-xl font-black text-[var(--text-primary)] mb-2">Pro</h3>
             <div className="text-4xl font-black text-[var(--text-primary)] mb-6">$29<span className="text-lg font-normal text-[var(--text-secondary)]">/mo</span></div>
             <p className="text-[var(--text-secondary)] text-sm mb-8">Unlimited power. No limits. The best models, always routed perfectly.</p>
             <button 
               onClick={onUpgrade}
-              className="mt-auto w-full py-4 rounded-xl font-black text-[10px] uppercase tracking-widest bg-[var(--accent)] hover:brightness-110 text-white transition-all shadow-lg shadow-[var(--accent)]/20"
+              className="mt-auto w-full py-4 rounded-xl font-black text-[12px] uppercase tracking-widest bg-[var(--accent)] hover:brightness-110 text-white transition-all shadow-lg shadow-[var(--accent)]/20"
             >
               Get Started with Pro
             </button>
@@ -60,9 +60,9 @@ const Pricing: React.FC<PricingProps> = ({ onUpgrade, onClose }) => {
           <table className="w-full text-left min-w-[400px]">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--bg-secondary)]/50">
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Feature</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Free</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Pro</th>
+                <th className="px-6 py-4 text-[12px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Feature</th>
+                <th className="px-6 py-4 text-[12px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Free</th>
+                <th className="px-6 py-4 text-[12px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Pro</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">

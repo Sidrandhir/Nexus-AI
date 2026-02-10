@@ -32,10 +32,10 @@ const Billing: React.FC<BillingProps> = ({ stats, onCancel, onUpgrade, onClose }
         <div className="bg-[var(--bg-tertiary)] p-4 sm:p-6 md:p-8 rounded-3xl border border-[var(--border)]">
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
             <div>
-              <p className="text-[10px] text-[var(--text-secondary)] font-black uppercase tracking-widest mb-1">Current Plan</p>
+              <p className="text-[12px] text-[var(--text-secondary)] font-black uppercase tracking-widest mb-1">Current Plan</p>
               <h3 className="text-2xl font-black text-[var(--text-primary)] flex items-center gap-3">
                 {isPro ? 'NEXUS Pro' : 'NEXUS Free'}
-                <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${stats.subscriptionStatus === 'active' ? 'bg-[#10a37f]/10 text-[#10a37f]' : 'bg-[var(--text-secondary)]/10 text-[var(--text-secondary)]'}`}>
+                <span className={`text-[12px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${stats.subscriptionStatus === 'active' ? 'bg-[#10a37f]/10 text-[#10a37f]' : 'bg-[var(--text-secondary)]/10 text-[var(--text-secondary)]'}`}>
                   {stats.subscriptionStatus?.toUpperCase() || 'NONE'}
                 </span>
               </h3>
@@ -43,7 +43,7 @@ const Billing: React.FC<BillingProps> = ({ stats, onCancel, onUpgrade, onClose }
             {!isPro && (
               <button 
                 onClick={onUpgrade}
-                className="bg-[var(--accent)] hover:brightness-110 px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-lg shadow-[var(--accent)]/20"
+                className="bg-[var(--accent)] hover:brightness-110 px-6 py-2 rounded-xl font-black text-[12px] uppercase tracking-widest text-white transition-all shadow-lg shadow-[var(--accent)]/20"
               >
                 Upgrade to Pro
               </button>
@@ -52,12 +52,12 @@ const Billing: React.FC<BillingProps> = ({ stats, onCancel, onUpgrade, onClose }
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-1">Price</p>
+              <p className="text-[12px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-1">Price</p>
               <p className="font-bold text-[var(--text-primary)]">{isPro ? '$29 / month' : '$0 / month'}</p>
             </div>
             {isPro && stats.currentPeriodEnd && (
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-1">Renews On</p>
+                <p className="text-[12px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-1">Renews On</p>
                 <p className="font-bold text-[var(--text-primary)]">{new Date(stats.currentPeriodEnd).toLocaleDateString()}</p>
               </div>
             )}
@@ -67,7 +67,7 @@ const Billing: React.FC<BillingProps> = ({ stats, onCancel, onUpgrade, onClose }
             <div className="mt-8 pt-8 border-t border-[var(--border)]">
               <button 
                 onClick={onCancel}
-                className="text-red-500 text-[10px] font-black uppercase tracking-widest hover:underline"
+                className="text-red-500 text-[12px] font-black uppercase tracking-widest hover:underline"
               >
                 Cancel Subscription
               </button>
@@ -77,26 +77,26 @@ const Billing: React.FC<BillingProps> = ({ stats, onCancel, onUpgrade, onClose }
 
         {/* Billing History */}
         <div className="space-y-4">
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-2">Billing History</h3>
+          <h3 className="text-[12px] font-black uppercase tracking-widest text-[var(--text-secondary)] px-2">Billing History</h3>
           <div className="bg-[var(--bg-tertiary)] rounded-3xl border border-[var(--border)] overflow-hidden overflow-x-auto">
             {stats.billingHistory && stats.billingHistory.length > 0 ? (
               <table className="w-full text-left min-w-[480px]">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--bg-secondary)]/50">
-                    <th className="px-6 py-3 text-[9px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Invoice ID</th>
-                    <th className="px-6 py-3 text-[9px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Date</th>
-                    <th className="px-6 py-3 text-[9px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Amount</th>
-                    <th className="px-6 py-3 text-[9px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Status</th>
+                    <th className="px-6 py-3 text-[12px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Invoice ID</th>
+                    <th className="px-6 py-3 text-[12px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Date</th>
+                    <th className="px-6 py-3 text-[12px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Amount</th>
+                    <th className="px-6 py-3 text-[12px] font-black uppercase tracking-wider text-[var(--text-secondary)]">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {stats.billingHistory.map((item) => (
                     <tr key={item.id} className="text-sm hover:bg-[var(--bg-primary)] transition-colors">
-                      <td className="px-6 py-4 font-mono text-[10px] text-[var(--text-primary)]">{item.id}</td>
+                      <td className="px-6 py-4 font-mono text-[12px] text-[var(--text-primary)]">{item.id}</td>
                       <td className="px-6 py-4 text-[var(--text-primary)]">{new Date(item.date).toLocaleDateString()}</td>
                       <td className="px-6 py-4 font-bold text-[var(--text-primary)]">${(item.amount / 100).toFixed(2)}</td>
                       <td className="px-6 py-4">
-                        <span className="bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest">
+                        <span className="bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded text-[12px] font-black uppercase tracking-widest">
                           {item.status.toUpperCase()}
                         </span>
                       </td>

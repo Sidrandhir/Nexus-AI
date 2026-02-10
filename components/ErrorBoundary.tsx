@@ -39,9 +39,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 </p>
                 {process.env.NODE_ENV === 'development' && this.state.error && (
                   <div className="mb-4 p-3 rounded bg-red-500/10 border border-red-500/20">
-                    <p className="text-xs font-mono text-red-400">{this.state.error.message}</p>
+                    <p className="text-[13px] font-mono text-red-400">{this.state.error.message}</p>
                     {this.state.error.stack && (
-                      <pre className="mt-2 text-[10px] text-red-300 overflow-auto max-h-32">
+                      <pre className="mt-2 text-[12px] text-red-300 overflow-auto max-h-32">
                         {this.state.error.stack}
                       </pre>
                     )}

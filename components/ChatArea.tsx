@@ -45,7 +45,7 @@ const EnhancedTable = ({ children, ...props }: any) => {
   return (
     <div className="group/table relative my-6 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-tertiary)]/5 transition-all hover:border-[var(--text-secondary)]/30 shadow-sm">
       <div className="absolute top-2 right-2 z-10 opacity-0 group-hover/table:opacity-100 transition-opacity">
-        <button onClick={handleCopyData} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all active:scale-95">
+        <button onClick={handleCopyData} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all active:scale-95">
           {copied ? <Icons.Check className="w-3 h-3" /> : <Icons.Copy className="w-3 h-3" />}
           {copied ? 'Copied' : 'Copy'}
         </button>
@@ -64,7 +64,7 @@ const EnhancedChart = ({ dataStr }: { dataStr: string }) => {
       if (active && payload && payload.length) {
         return (
           <div className="bg-[var(--bg-secondary)] border border-[var(--border)] p-3 rounded-lg shadow-xl">
-            <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-0.5">{label}</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-0.5">{label}</p>
             <p className="text-sm font-bold text-[var(--text-primary)]">{payload[0].value}</p>
           </div>
         );
@@ -73,7 +73,7 @@ const EnhancedChart = ({ dataStr }: { dataStr: string }) => {
     };
     return (
       <div className="my-6 p-4 sm:p-6 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]/20 relative overflow-hidden group/chart transition-all">
-        <div className="mb-4 flex justify-between items-center opacity-60"><h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)]">{label}</h4></div>
+        <div className="mb-4 flex justify-between items-center opacity-60"><h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">{label}</h4></div>
         <div className="h-56 sm:h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             {type === 'bar' ? (
@@ -149,9 +149,9 @@ const MermaidBlock = ({ code }: { code: string }) => {
   return (
     <div className="relative group/mermaid my-6 border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--code-bg)] shadow-sm transition-all hover:border-[var(--text-secondary)]/20">
       <div className="flex items-center justify-between px-4 py-2 bg-[var(--code-header)] border-b border-[var(--border)]">
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-50">DIAGRAM</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] opacity-50">DIAGRAM</span>
         {svg && (
-          <button onClick={handleDownloadSvg} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all">
+          <button onClick={handleDownloadSvg} className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all">
             <Icons.Download className="w-3 h-3" />
             Download SVG
           </button>
@@ -218,19 +218,19 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   return (
     <div className="relative group/code my-6 border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--code-bg)] shadow-sm max-w-full transition-all hover:border-[var(--text-secondary)]/20">
       <div className="flex items-center justify-between px-4 py-2 bg-[var(--code-header)] border-b border-[var(--border)]">
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] opacity-50">{language || 'SOURCE'}</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] opacity-50">{language || 'SOURCE'}</span>
         <div className="flex items-center gap-3">
-          <button onClick={handleDownload} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all">
+          <button onClick={handleDownload} className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all">
             <Icons.Download className="w-3 h-3" />
             Download
           </button>
-          <button onClick={handleCopy} className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${copied ? 'text-emerald-500' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+          <button onClick={handleCopy} className={`flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider transition-all ${copied ? 'text-emerald-500' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
             {copied ? <Icons.Check className="w-3 h-3" /> : <Icons.Copy className="w-3 h-3" />}
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
       </div>
-      <pre className="overflow-x-auto custom-scrollbar leading-relaxed"><code ref={codeRef} className={`hljs ${className || ''} block p-5 w-fit min-w-full text-[0.9rem]`} dangerouslySetInnerHTML={{ __html: highlightedHtml }} /></pre>
+      <pre className="overflow-x-auto custom-scrollbar leading-relaxed"><code ref={codeRef} className={`hljs ${className || ''} block p-5 w-fit min-w-full text-[0.875rem] sm:text-[0.875rem]`} dangerouslySetInnerHTML={{ __html: highlightedHtml }} /></pre>
     </div>
   );
 });
@@ -365,7 +365,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     table: EnhancedTable,
     p: ({ children }: any) => <div className="mb-4 leading-relaxed">{children}</div>,
     code: ({ node, inline, className, children, ...props }: any) => {
-      return !inline ? (<CodeBlock className={className} children={children} />) : (<code className={`${className || ''} text-[var(--accent)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-md text-[0.9em] font-semibold border border-[var(--border)]`} {...props}>{children}</code>);
+      return !inline ? (<CodeBlock className={className} children={children} />) : (<code className={`${className || ''} text-[var(--accent)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-md text-[0.875em] font-semibold border border-[var(--border)]`} {...props}>{children}</code>);
     }
   }), []);
 
@@ -381,7 +381,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             </button>
           )}
           <div className="flex flex-col">
-            <h2 className="text-[11px] font-black uppercase tracking-[0.25em] text-[var(--text-primary)] truncate max-w-[140px] sm:max-w-none">{session?.title || "New Chat"}</h2>
+            <h2 className="text-[13px] sm:text-sm font-bold tracking-tight text-[var(--text-primary)] truncate max-w-[140px] sm:max-w-none">{session?.title || "New Chat"}</h2>
             <div className="flex items-center gap-1.5 mt-0.5">
               <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
             </div>
@@ -430,7 +430,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium text-[var(--text-primary)] truncate">{doc.title}</p>
-                              <p className="text-[10px] text-[var(--text-secondary)]">{isZip ? `${zipFileCount} file${zipFileCount !== 1 ? 's' : ''}` : `${info.label} file`}</p>
+                              <p className="text-[11px] text-[var(--text-secondary)]">{isZip ? `${zipFileCount} file${zipFileCount !== 1 ? 's' : ''}` : `${info.label} file`}</p>
                             </div>
                           </div>
                         );
@@ -444,12 +444,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                         <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-75" />
                         <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-150" />
                       </div>
-                      <span className="text-[11px] font-semibold text-[var(--text-secondary)] animate-pulse">Thinking...</span>
+                      <span className="text-[13px] sm:text-sm font-medium text-[var(--text-secondary)] animate-pulse">Thinking...</span>
                     </div>
                   ) : editingId === msg.id ? (
                     <div className="space-y-4">
-                      <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} aria-label="Edit message content" placeholder="Edit your message..." className="w-full bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl p-5 text-sm focus:outline-none focus:border-[var(--accent)] transition-all leading-relaxed text-[var(--text-primary)] shadow-inner" rows={3} />
-                      <div className="flex gap-2"><button onClick={() => submitEdit(msg.id)} className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-[var(--accent)]/10">Update</button><button onClick={() => setEditingId(null)} className="px-5 py-2.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] rounded-xl text-[10px] font-black uppercase tracking-widest border border-[var(--border)] active:scale-95 transition-all">Cancel</button></div>
+                      <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} aria-label="Edit message content" placeholder="Edit your message..." className="w-full bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl p-5 text-[15px] sm:text-base focus:outline-none focus:border-[var(--accent)] transition-all leading-relaxed text-[var(--text-primary)] shadow-inner" rows={3} />
+                      <div className="flex gap-2"><button onClick={() => submitEdit(msg.id)} className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-xl text-[13px] sm:text-sm font-semibold active:scale-95 transition-all shadow-lg shadow-[var(--accent)]/10">Update</button><button onClick={() => setEditingId(null)} className="px-5 py-2.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] rounded-xl text-[13px] sm:text-sm font-semibold border border-[var(--border)] active:scale-95 transition-all">Cancel</button></div>
                     </div>
                   ) : (
                     <div className="markdown-body"><ReactMarkdown remarkPlugins={remarkPluginsStable} components={markdownComponents}>{msg.content}</ReactMarkdown></div>
@@ -467,7 +467,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                           if (!uri) return null;
                           return (
                             <a key={i} href={uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]/40 border border-[var(--border)] hover:border-[var(--accent)]/50 transition-all group shadow-sm active:scale-[0.98]">
-                              <span className="text-[10px] font-bold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] truncate max-w-[180px]">{title || "Source"}</span>
+                              <span className="text-[12px] sm:text-[13px] font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] truncate max-w-[180px]">{title || "Source"}</span>
                               <Icons.PanelLeftOpen className="w-2 h-2 opacity-30 group-hover:opacity-100 rotate-180 transition-opacity" />
                             </a>
                           );
@@ -478,7 +478,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 </div>
                 {idx === messages.length - 1 && msg.role === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && !isLoading && (
                   <div className="mt-8 flex flex-col gap-3 items-start animate-in fade-in slide-in-from-bottom-2 duration-700">
-                    <div className="flex flex-wrap gap-2">{msg.suggestions.map((suggestion, i) => (<button key={i} onClick={() => onSuggestionClick?.(suggestion)} className="px-4 py-2.5 rounded-xl bg-[var(--bg-tertiary)]/20 border border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] text-left active:scale-[0.97] shadow-sm">{suggestion}</button>))}</div>
+                    <div className="flex flex-wrap gap-2">{msg.suggestions.map((suggestion, i) => (<button key={i} onClick={() => onSuggestionClick?.(suggestion)} className="px-4 py-2.5 rounded-xl bg-[var(--bg-tertiary)]/20 border border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all text-[13px] sm:text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] text-left active:scale-[0.97] shadow-sm">{suggestion}</button>))}</div>
                   </div>
                 )}
                 <div className={`mt-2 flex items-center gap-1 ${msg.role === 'assistant' ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity ${msg.role === 'user' ? 'justify-end pr-2' : 'pl-2'}`}>
