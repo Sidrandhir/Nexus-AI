@@ -2,10 +2,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AIModel, Message, RouterResult, MessageImage, GroundingChunk, AttachedDocument, QueryIntent } from "../types";
 import { logError } from "./analyticsService";
 
-// Concurrency guard — only one request at a time
+// Concurrency guard — prevent duplicate concurrent requests
 let isRequestPending = false;
 let lastRequestTimestamp = 0;
-const MIN_REQUEST_GAP = 500;
+const MIN_REQUEST_GAP = 100;
 
 // Model Mapping — Paid billing: use best available models freely
 const CORE_MODELS = {
@@ -14,62 +14,46 @@ const CORE_MODELS = {
 };
 
 const SYSTEM_CORE = `
-# IDENTITY & ROLE
-You are Nexus AI — a professional cognitive assistant for thinking, analysis, and decision-making.
-- You are NOT a generic chatbot. You are a precision reasoning engine.
-- If asked who you are: "I am Nexus AI, a unified intelligence system created by the Nexus AI team."
+# IDENTITY
+You are Nexus AI — a precision reasoning engine created by the Nexus AI team.
+If asked who you are: "I am Nexus AI, a unified intelligence system."
 
-# CORE PURPOSE
-Deliver expert-grade, structured, in-depth answers on any topic. Act like a senior engineer, analyst, or strategist would — with clarity, evidence, and actionable depth.
+# RESPONSE RULES
+1. **DIRECT ANSWER FIRST** — First sentence answers the question. No filler ("Great question!", "Sure!", "Let me explain...").
+2. **STRUCTURED** — Use ## headings, **bold leads**, numbered lists for steps, bullets for options, tables for comparisons, \`code\` for technical terms.
+3. **CODE** — Always use language identifiers. Provide COMPLETE, RUNNABLE code with brief inline comments.
+4. **CONCISE DEPTH** — Cover what matters: the answer, the why, edge cases. Skip obvious explanations. Never repeat the same idea twice.
+5. **CLOSING** — End with ONE: a recommendation, a next step, or a key summary. Never end with "Hope this helps!" or similar.
 
-# RESPONSE STRUCTURE — MANDATORY FORMAT
-Every response MUST follow this structure:
+# VERBOSITY CONTROL
+- Match response length to question complexity. Simple questions get short answers.
+- For code requests: prioritize the code block. Add only essential explanation below it.
+- If the user says "just code" or "code only": return ONLY the code block, no explanation.
+- Never restate the question back. Never pad with generic context the user already knows.
+- Every sentence must earn its place. Cut ruthlessly.
 
-1. **DIRECT ANSWER FIRST** — The very first sentence must directly answer the question or state the conclusion. Never open with filler like "Great question!" or "Sure, let me explain..." or "That's interesting." Jump straight to the answer.
-
-2. **STRUCTURED BODY** — Break your response into clearly labeled sections:
-   - Use ## and ### markdown headings to separate major topics
-   - Use **bold lead terms** at the start of each bullet point
-   - Use numbered lists (1. 2. 3.) for sequential steps, processes, or instructions
-   - Use bullet points (- ) for non-sequential items, features, or options
-   - Use tables (| col | col |) whenever comparing 2+ options, approaches, or items side-by-side
-   - Use > blockquotes for important warnings, tips, or key takeaways
-   - Use \`inline code\` for variables, commands, file names, and technical terms
-
-3. **CODE BLOCKS** — When providing code:
-   - Always include the language identifier (e.g. \`\`\`python, \`\`\`typescript, \`\`\`sql)
-   - Provide COMPLETE, RUNNABLE code — never partial snippets
-   - Add brief comments inside the code explaining key logic
-   - If the code is long, break it into logical sections with headings above each block
-
-4. **DEPTH & THOROUGHNESS** — CRITICAL:
-   - Minimum: 3-5 substantive paragraphs for any non-trivial question
-   - Explain the WHY behind every recommendation, not just the WHAT
-   - Cover edge cases, trade-offs, and common pitfalls
-   - For technical topics: include full code + explanation + usage examples
-   - For analytical topics: provide multiple perspectives, evidence, and detailed reasoning
-   - For simple yes/no questions: answer directly first, then explain WHY in depth
-
-5. **CLOSING** — End with exactly ONE of these (pick the most relevant):
-   - A clear **recommendation**: "For your use case, I'd recommend X because..."
-   - An **actionable next step**: "To get started, run..."
-   - A brief **summary** of key points if the response was long
-
-# FORMATTING RULES
-- Never write long unbroken paragraphs. Break after every 2-3 sentences.
-- Never use comparisons in paragraph form — always use a table.
-- Never end with "Hope this helps!" or "Let me know if you need more!" — just end with substance.
-- Use --- horizontal rules to separate major conceptual sections when a response is long.
-- Make responses scannable: a reader should understand the answer in 3 seconds by reading only headings and bold terms.
+# FORMATTING
+- Break paragraphs every 2-3 sentences.
+- Use tables for comparisons, never prose.
+- Use > blockquotes for critical warnings only.
+- Make responses scannable via headings and bold terms.
 
 # TONE
-- Professional, direct, confident
-- No hedging ("I think maybe..."), no filler, no apologetics
-- Explanatory but efficient — every sentence earns its place
+Professional, direct, confident. No hedging, no filler, no apologies.
 
-# LIVE BROWSING & REAL-TIME DATA
-When using Google Search grounding, provide up-to-date, factual information based on the CURRENT DATE AND TIME in your instructions.
-Reference findings clearly. For "today", "now", or "latest" queries, use the provided clock context.
+# LIVE DATA
+When using Google Search grounding, provide current factual information based on the date/time in context.
+`;
+
+const CODING_ADDENDUM = `
+# CODING MODE — ACTIVE
+- Lead with the complete code solution. Explanation follows AFTER the code, not before.
+- Keep explanation to essential points: what the code does, key design decisions, gotchas.
+- Do NOT explain language basics, obvious syntax, or standard library usage.
+- Do NOT repeat the same concept in different words.
+- Include error handling and edge cases in the code itself, not as separate prose.
+- If asked to debug: show the fix first, then explain the root cause in 1-2 sentences.
+- End coding answers with follow-up suggestions the user might want: "You could also explore: ..."
 `;
 
 const classifyIntent = (prompt: string, hasImage: boolean, hasDocs: boolean): QueryIntent => {
@@ -107,7 +91,13 @@ export const getAIResponse = async (
   signal?: AbortSignal
 ): Promise<{ content: string; model: AIModel; tokens: number; inputTokens: number; outputTokens: number; groundingChunks?: GroundingChunk[]; routingContext: any }> => {
   
-  if (isRequestPending) throw new Error("Synchronization in progress. Please wait for the current stream to complete.");
+  // If a previous request is still pending, wait briefly for it to clear
+  if (isRequestPending) {
+    await sleep(300);
+    if (isRequestPending) {
+      isRequestPending = false; // Force-clear stale lock
+    }
+  }
   
   // Smooth out rapid requests — wait instead of throwing
   const now = Date.now();
@@ -126,6 +116,10 @@ export const getAIResponse = async (
 
   // Use PRO for coding/complex tasks, FLASH for everything else
   const targetEngine = (routing.intent === 'coding' && routing.model === AIModel.CLAUDE) ? CORE_MODELS.PRO : CORE_MODELS.FLASH;
+
+  // Dynamic token budget based on intent
+  const intentMaxTokens: Record<string, number> = { live: 2048, coding: 8192, general: 4096 };
+  const maxTokenBudget = intentMaxTokens[routing.intent] || 4096;
 
   // Real-time Clock Context injection
   const currentDate = new Date();
@@ -147,10 +141,11 @@ export const getAIResponse = async (
       if (!apiKey) throw new Error('Gemini API key not configured. Please add GEMINI_API_KEY to your environment.');
       const ai = new GoogleGenAI({ apiKey });
       
-      // Send up to 10 history messages — paid account can handle the tokens
-      const contents: any[] = history.slice(-10).map(msg => ({
+      // Send recent history — trimmed for speed. Truncate long messages to reduce input tokens.
+      const MAX_MSG_LEN = 3000;
+      const contents: any[] = history.slice(-6).map(msg => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
+        parts: [{ text: msg.content.length > MAX_MSG_LEN ? msg.content.slice(0, MAX_MSG_LEN) + '...[truncated]' : msg.content }]
       }));
       
       const currentParts: any[] = [];
@@ -170,7 +165,8 @@ export const getAIResponse = async (
       let usage: any = { totalTokenCount: 0, promptTokenCount: 0, candidatesTokenCount: 0 };
       let groundingChunks: GroundingChunk[] = [];
 
-      const finalSystemInstruction = `${SYSTEM_CORE}\n${dateContext}\n[PREFERENCE]: ${personification}`;
+      const codingBlock = routing.intent === 'coding' ? CODING_ADDENDUM : '';
+      const finalSystemInstruction = `${SYSTEM_CORE}${codingBlock}\n${dateContext}\n[PREFERENCE]: ${personification}`;
 
       if (onStreamChunk) {
         const result = await ai.models.generateContentStream({
@@ -179,7 +175,7 @@ export const getAIResponse = async (
           config: {
             systemInstruction: finalSystemInstruction,
             temperature: routing.intent === 'coding' ? 0.2 : 0.7,
-            maxOutputTokens: 8192,
+            maxOutputTokens: maxTokenBudget,
             tools: tools.length > 0 ? tools : undefined
           },
         });
@@ -191,7 +187,9 @@ export const getAIResponse = async (
           onStreamChunk(text);
           if (chunk.usageMetadata) usage = chunk.usageMetadata;
           const chunks = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
-          if (chunks) groundingChunks = [...groundingChunks, ...(chunks as GroundingChunk[])];
+          if (chunks) {
+            for (const c of chunks as GroundingChunk[]) groundingChunks.push(c);
+          }
         }
       } else {
         const response = await ai.models.generateContent({
@@ -200,7 +198,7 @@ export const getAIResponse = async (
           config: {
             systemInstruction: finalSystemInstruction,
             temperature: routing.intent === 'coding' ? 0.2 : 0.7,
-            maxOutputTokens: 8192,
+            maxOutputTokens: maxTokenBudget,
             tools: tools.length > 0 ? tools : undefined
           },
         });
@@ -256,11 +254,11 @@ export const generateFollowUpSuggestions = async (lastMsg: string, intent: Query
     const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
     if (!apiKey) return [];
     const ai = new GoogleGenAI({ apiKey });
-    const trimmed = lastMsg.length > 2000 ? lastMsg.substring(0, 2000) : lastMsg;
+    const trimmed = lastMsg.length > 800 ? lastMsg.substring(0, 800) : lastMsg;
     const response = await ai.models.generateContent({
       model: CORE_MODELS.FLASH,
-      contents: `Suggest 3 follow-up questions for: "${trimmed}". Return JSON array.`,
-      config: { responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } } }
+      contents: `Suggest 3 brief follow-up questions for: "${trimmed}". Return JSON array of strings.`,
+      config: { responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }, maxOutputTokens: 256 }
     });
     return JSON.parse(response.text || "[]").slice(0, 3);
   } catch (err) { return []; }

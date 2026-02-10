@@ -47,6 +47,12 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const attachMenuRef = useRef<HTMLDivElement>(null);
   const attachBtnRef = useRef<HTMLButtonElement>(null);
   const recognitionRef = useRef<any>(null);
+  const isListeningRef = useRef(false);
+  const finalTranscriptRef = useRef('');
+  const baseInputRef = useRef('');
+  const restartCountRef = useRef(0);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [interimText, setInterimText] = useState('');
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const [attachMenuPos, setAttachMenuPos] = useState<{ top: number; left: number } | null>(null);
 
@@ -126,10 +132,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showModelDropdown]);
 
-  // Reposition on scroll/resize while open
+  // Reposition on scroll/resize while open (RAF-debounced to avoid forced reflow)
   useEffect(() => {
     if (!showModelDropdown) return;
-    const handleReposition = () => updateDropdownPosition();
+    let rafId = 0;
+    const handleReposition = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => updateDropdownPosition());
+    };
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setShowModelDropdown(false);
     };
@@ -137,6 +147,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
     window.addEventListener('scroll', handleReposition, true);
     document.addEventListener('keydown', handleEscape);
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
       document.removeEventListener('keydown', handleEscape);
@@ -177,10 +188,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAttachMenu]);
 
-  // Reposition attach menu on scroll/resize
+  // Reposition attach menu on scroll/resize (RAF-debounced)
   useEffect(() => {
     if (!showAttachMenu) return;
-    const handleReposition = () => updateAttachMenuPosition();
+    let rafId = 0;
+    const handleReposition = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => updateAttachMenuPosition());
+    };
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setShowAttachMenu(false);
     };
@@ -188,6 +203,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
     window.addEventListener('scroll', handleReposition, true);
     document.addEventListener('keydown', handleEscape);
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener('resize', handleReposition);
       window.removeEventListener('scroll', handleReposition, true);
       document.removeEventListener('keydown', handleEscape);
@@ -195,14 +211,20 @@ const MessageInput: React.FC<MessageInputProps> = ({
   }, [showAttachMenu, updateAttachMenuPosition]);
 
   // Web Speech API for voice transcription
-  const toggleVoiceInput = useCallback(() => {
+  const MAX_RESTARTS = 15;
+
+  const startRecognition = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-      return;
+    // Clean up any existing instance
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.stop();
+      } catch {}
     }
 
     const recognition = new SpeechRecognition();
@@ -210,38 +232,97 @@ const MessageInput: React.FC<MessageInputProps> = ({
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
-    let finalTranscript = '';
-
     recognition.onresult = (event: any) => {
+      restartCountRef.current = 0; // Reset on successful speech
       let interim = '';
+      let finalForThisEvent = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          finalTranscript += transcript + ' ';
+          finalForThisEvent += transcript + ' ';
         } else {
           interim = transcript;
         }
       }
-      setInput(prev => {
-        const base = prev.replace(/[\u200B].*$/, '').trimEnd();
-        const combined = base + (base ? ' ' : '') + finalTranscript + interim;
-        return combined;
-      });
+      if (finalForThisEvent) {
+        finalTranscriptRef.current += finalForThisEvent;
+      }
+      setInterimText(interim);
+      const base = baseInputRef.current;
+      const separator = base && !base.endsWith(' ') ? ' ' : '';
+      setInput(base + separator + finalTranscriptRef.current + interim);
     };
 
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (event: any) => {
+      if (event.error === 'no-speech' || event.error === 'audio-capture' || event.error === 'aborted') return;
+      isListeningRef.current = false;
+      setIsListening(false);
+      setInterimText('');
+    };
+
+    recognition.onend = () => {
+      if (isListeningRef.current && restartCountRef.current < MAX_RESTARTS) {
+        restartCountRef.current++;
+        restartTimerRef.current = setTimeout(() => {
+          if (isListeningRef.current) {
+            startRecognition();
+          }
+        }, 250);
+      } else {
+        isListeningRef.current = false;
+        setIsListening(false);
+        setInterimText('');
+      }
+    };
 
     recognition.start();
     recognitionRef.current = recognition;
-    setIsListening(true);
-  }, [isListening]);
+  }, []);
+
+  const stopRecognition = useCallback(() => {
+    isListeningRef.current = false;
+    setIsListening(false);
+    setInterimText('');
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.stop();
+      } catch {}
+      recognitionRef.current = null;
+    }
+    setInput(prev => prev.trim());
+    finalTranscriptRef.current = '';
+    baseInputRef.current = '';
+  }, []);
+
+  const toggleVoiceInput = useCallback(() => {
+    if (isListeningRef.current) {
+      stopRecognition();
+    } else {
+      baseInputRef.current = input;
+      finalTranscriptRef.current = '';
+      restartCountRef.current = 0;
+      isListeningRef.current = true;
+      setIsListening(true);
+      startRecognition();
+    }
+  }, [input, startRecognition, stopRecognition]);
 
   // Cleanup recognition on unmount
   useEffect(() => {
     return () => {
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.onend = null;
+          recognitionRef.current.stop();
+        } catch {}
       }
     };
   }, []);
@@ -394,11 +475,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      const newHeight = Math.min(textareaRef.current.scrollHeight, window.innerHeight * 0.3);
-      textareaRef.current.style.height = `${newHeight}px`;
-    }
+    const el = textareaRef.current;
+    if (!el) return;
+    const raf = requestAnimationFrame(() => {
+      el.style.height = 'auto';
+      const newHeight = Math.min(el.scrollHeight, window.innerHeight * 0.3);
+      el.style.height = `${newHeight}px`;
+    });
+    return () => cancelAnimationFrame(raf);
   }, [input]);
 
 const hasAttachments = imagePreview || attachedDocs.length > 0;
@@ -675,7 +759,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
           {/* Right side buttons */}
           <div className="flex items-center gap-0.5 mb-0.5 flex-shrink-0">
             {/* Voice transcription mic */}
-            {!input.trim() && !isDisabled && (
+            {(!input.trim() || isListening) && !isDisabled && (
               <button 
                 onClick={toggleVoiceInput}
                 aria-label={isListening ? "Stop listening" : "Voice input"}

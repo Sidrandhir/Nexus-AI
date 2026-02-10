@@ -138,6 +138,25 @@ const App: React.FC = () => {
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
 
+  const handleExportChat = useCallback(() => {
+    if (!activeSession || activeSession.messages.length === 0) return;
+    let md = `# ${activeSession.title || 'Chat Export'}\n\n`;
+    md += `*Exported on ${new Date().toLocaleString()}*\n\n---\n\n`;
+    activeSession.messages.forEach(msg => {
+      const role = msg.role === 'user' ? '**You**' : '**Nexus AI**';
+      md += `### ${role}\n\n${msg.content}\n\n---\n\n`;
+    });
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(activeSession.title || 'chat').replace(/[^a-z0-9]/gi, '_')}_export.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [activeSession]);
+
   const requestAIResponse = async (sessionId: string, currentHistory: Message[]) => {
     if (!user || isLoading) return;
     setIsLoading(true);
@@ -155,6 +174,16 @@ const App: React.FC = () => {
     } : s));
 
     let accumulatedText = "";
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flushToUI = () => {
+      const snapshot = accumulatedText;
+      setSessions(prev => prev.map(s => s.id === sessionId ? {
+        ...s,
+        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: snapshot } : m)
+      } : s));
+      flushTimer = null;
+    };
 
     try {
       const response = await getAIResponse(
@@ -167,15 +196,23 @@ const App: React.FC = () => {
         userSettings.personification,
         (chunk) => {
           accumulatedText += chunk;
-          setSessions(prev => prev.map(s => s.id === sessionId ? {
-            ...s,
-            messages: s.messages.map(m => m.id === assistantId ? { ...m, content: accumulatedText } : m)
-          } : s));
+          // Throttle UI updates to ~8/sec — prevents markdown re-parse jank
+          if (!flushTimer) {
+            flushTimer = setTimeout(flushToUI, 120);
+          }
         },
         abortControllerRef.current.signal
       );
 
-      const suggestions = await generateFollowUpSuggestions(response.content, previewRouting.intent);
+      // Final flush to ensure all accumulated text is rendered
+      if (flushTimer) clearTimeout(flushTimer);
+      setSessions(prev => prev.map(s => s.id === sessionId ? {
+        ...s,
+        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: accumulatedText } : m)
+      } : s));
+
+      // Fire suggestions in background — don't block the main response
+      const suggestionsPromise = generateFollowUpSuggestions(response.content, previewRouting.intent).catch(() => []);
 
       const savedAssistantMsg = await api.saveMessage(sessionId, {
         role: 'assistant',
@@ -187,7 +224,6 @@ const App: React.FC = () => {
         groundingChunks: response.groundingChunks,
         routingContext: response.routingContext,
         timestamp: Date.now(),
-        suggestions
       });
       
       setSessions(prev => prev.map(s => s.id === sessionId ? {
@@ -195,13 +231,24 @@ const App: React.FC = () => {
         messages: s.messages.map(m => m.id === assistantId ? savedAssistantMsg : m)
       } : s));
 
+      // Apply suggestions when they arrive (non-blocking)
+      suggestionsPromise.then(suggestions => {
+        if (suggestions.length > 0) {
+          setSessions(prev => prev.map(s => s.id === sessionId ? {
+            ...s,
+            messages: s.messages.map(m => m.id === savedAssistantMsg.id ? { ...m, suggestions } : m)
+          } : s));
+        }
+      });
+
       getStats(user.id).then(setUserStats);
 
+      // Generate title in background — don't block UI
       if (currentHistory.length === 1 && (activeSession?.title === "New Chat" || !activeSession?.title)) {
-        const newTitle = await generateChatTitle(userMsg.content);
-        handleRenameSession(sessionId, newTitle);
+        generateChatTitle(userMsg.content).then(newTitle => handleRenameSession(sessionId, newTitle)).catch(() => {});
       }
     } catch (error: any) {
+      if (flushTimer) clearTimeout(flushTimer);
       if (error.name !== 'AbortError') {
         addToast(error.message, "error");
         setSessions(prev => prev.map(s => s.id === sessionId ? { 
@@ -308,7 +355,7 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col min-w-0 relative">
         {view === 'chat' && activeSession ? (
           <>
-            <ChatArea session={activeSession} isLoading={isLoading} routingInfo={routingInfo} onExport={() => {}} onShare={() => {}} onModelChange={handleModelChange} onToggleSidebar={() => setIsSidebarOpen(true)} isSidebarOpen={isSidebarOpen} onRegenerate={handleRegenerate} onEditMessage={handleEditMessage} onFeedback={handleFeedback} theme={theme} onThemeToggle={handleThemeToggle} onSuggestionClick={(txt) => handleSendMessage(txt)} />
+            <ChatArea session={activeSession} isLoading={isLoading} routingInfo={routingInfo} onExport={handleExportChat} onShare={() => {}} onModelChange={handleModelChange} onToggleSidebar={() => setIsSidebarOpen(true)} isSidebarOpen={isSidebarOpen} onRegenerate={handleRegenerate} onEditMessage={handleEditMessage} onFeedback={handleFeedback} theme={theme} onThemeToggle={handleThemeToggle} onSuggestionClick={(txt) => handleSendMessage(txt)} />
             <MessageInput onSendMessage={handleSendMessage} onStop={() => abortControllerRef.current?.abort()} isDisabled={isLoading} preferredModel={activeSession.preferredModel} onModelChange={handleModelChange} activeSessionId={activeSessionId} />
           </>
         ) : view === 'dashboard' ? (
