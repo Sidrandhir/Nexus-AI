@@ -212,10 +212,15 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   // Web Speech API for voice transcription
   const MAX_RESTARTS = 15;
+  const micStreamRef = useRef<MediaStream | null>(null);
 
   const startRecognition = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+      isListeningRef.current = false;
+      setIsListening(false);
+      return;
+    }
 
     // Clean up any existing instance
     if (recognitionRef.current) {
@@ -223,17 +228,19 @@ const MessageInput: React.FC<MessageInputProps> = ({
         recognitionRef.current.onend = null;
         recognitionRef.current.onresult = null;
         recognitionRef.current.onerror = null;
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
       } catch {}
+      recognitionRef.current = null;
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
+    recognition.maxAlternatives = 1;
 
     recognition.onresult = (event: any) => {
-      restartCountRef.current = 0; // Reset on successful speech
+      restartCountRef.current = 0;
       let interim = '';
       let finalForThisEvent = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -245,38 +252,67 @@ const MessageInput: React.FC<MessageInputProps> = ({
         }
       }
       if (finalForThisEvent) {
-        finalTranscriptRef.current += finalForThisEvent;
+        const base = baseInputRef.current;
+        const separator = base && !base.endsWith(' ') ? ' ' : '';
+        baseInputRef.current = (base + separator + finalForThisEvent).trimEnd() + ' ';
+        finalTranscriptRef.current = '';
+        setInput(baseInputRef.current);
+        setInterimText('');
+      } else {
+        setInterimText(interim);
+        const base = baseInputRef.current;
+        setInput(base + interim);
       }
-      setInterimText(interim);
-      const base = baseInputRef.current;
-      const separator = base && !base.endsWith(' ') ? ' ' : '';
-      setInput(base + separator + finalTranscriptRef.current + interim);
     };
 
     recognition.onerror = (event: any) => {
-      if (event.error === 'no-speech' || event.error === 'audio-capture' || event.error === 'aborted') return;
+      const err = event.error;
+      // 'no-speech' and 'aborted' are normal — onend will handle restart
+      if (err === 'no-speech' || err === 'aborted') return;
+      // Fatal errors — stop entirely
       isListeningRef.current = false;
       setIsListening(false);
       setInterimText('');
+      // Release mic stream on fatal error
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach(t => t.stop());
+        micStreamRef.current = null;
+      }
     };
 
     recognition.onend = () => {
+      setInterimText('');
       if (isListeningRef.current && restartCountRef.current < MAX_RESTARTS) {
         restartCountRef.current++;
+        const delay = /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 400 : 300;
         restartTimerRef.current = setTimeout(() => {
           if (isListeningRef.current) {
             startRecognition();
           }
-        }, 250);
+        }, delay);
       } else {
         isListeningRef.current = false;
         setIsListening(false);
         setInterimText('');
+        // Release mic stream when done
+        if (micStreamRef.current) {
+          micStreamRef.current.getTracks().forEach(t => t.stop());
+          micStreamRef.current = null;
+        }
       }
     };
 
-    recognition.start();
-    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch (e) {
+      isListeningRef.current = false;
+      setIsListening(false);
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach(t => t.stop());
+        micStreamRef.current = null;
+      }
+    }
   }, []);
 
   const stopRecognition = useCallback(() => {
@@ -292,10 +328,16 @@ const MessageInput: React.FC<MessageInputProps> = ({
         recognitionRef.current.onend = null;
         recognitionRef.current.onresult = null;
         recognitionRef.current.onerror = null;
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
       } catch {}
       recognitionRef.current = null;
     }
+    // Release the held mic stream
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+    }
+    // Finalize: trim stale interim text, keep only committed text
     setInput(prev => prev.trim());
     finalTranscriptRef.current = '';
     baseInputRef.current = '';
@@ -308,9 +350,26 @@ const MessageInput: React.FC<MessageInputProps> = ({
       baseInputRef.current = input;
       finalTranscriptRef.current = '';
       restartCountRef.current = 0;
-      isListeningRef.current = true;
-      setIsListening(true);
-      startRecognition();
+
+      // Request mic permission first, then start recognition
+      // Keep the stream alive so the browser doesn't release the mic
+      if (navigator.mediaDevices?.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+          micStreamRef.current = stream; // Hold reference — don't stop it
+          isListeningRef.current = true;
+          setIsListening(true);
+          startRecognition();
+        }).catch(() => {
+          // Permission denied or no mic
+          isListeningRef.current = false;
+          setIsListening(false);
+        });
+      } else {
+        // Fallback: try starting directly (older browsers)
+        isListeningRef.current = true;
+        setIsListening(true);
+        startRecognition();
+      }
     }
   }, [input, startRecognition, stopRecognition]);
 
@@ -321,8 +380,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
       if (recognitionRef.current) {
         try {
           recognitionRef.current.onend = null;
-          recognitionRef.current.stop();
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.abort();
         } catch {}
+      }
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach(t => t.stop());
+        micStreamRef.current = null;
       }
     };
   }, []);

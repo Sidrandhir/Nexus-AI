@@ -293,14 +293,49 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     synth.cancel();
     const cleaned = stripMarkdown(text);
     if (!cleaned) return;
-    const utterance = new SpeechSynthesisUtterance(cleaned);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.onend = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
-    utterance.onerror = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
-    utteranceRef.current = utterance;
-    setSpeakingMsgId(msgId);
-    synth.speak(utterance);
+
+    // Chrome desktop bug: voices may not be loaded yet.
+    // If no voices, wait for them, then retry once.
+    const doSpeak = () => {
+      const utterance = new SpeechSynthesisUtterance(cleaned);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      // Pick a good voice if available (prefer en-US, avoid novelty voices)
+      const voices = synth.getVoices();
+      const preferred = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) 
+        || voices.find(v => v.lang.startsWith('en-US') && !v.localService)
+        || voices.find(v => v.lang.startsWith('en'));
+      if (preferred) utterance.voice = preferred;
+      utterance.onend = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
+      utterance.onerror = (e) => { 
+        // 'interrupted' and 'canceled' are normal when user stops
+        if (e.error !== 'interrupted' && e.error !== 'canceled') {
+          setSpeakingMsgId(null); 
+          utteranceRef.current = null; 
+        }
+      };
+      utteranceRef.current = utterance;
+      setSpeakingMsgId(msgId);
+      // Chrome workaround: cancel + small delay before speaking
+      synth.cancel();
+      setTimeout(() => synth.speak(utterance), 50);
+    };
+
+    if (synth.getVoices().length === 0) {
+      // Voices not loaded yet — wait for voiceschanged
+      const onVoicesChanged = () => {
+        synth.removeEventListener('voiceschanged', onVoicesChanged);
+        doSpeak();
+      };
+      synth.addEventListener('voiceschanged', onVoicesChanged);
+      // Fallback: if voiceschanged never fires (Firefox), try after 500ms anyway
+      setTimeout(() => {
+        synth.removeEventListener('voiceschanged', onVoicesChanged);
+        if (!utteranceRef.current) doSpeak();
+      }, 500);
+    } else {
+      doSpeak();
+    }
   }, [speakingMsgId, stripMarkdown]);
 
   // Cleanup TTS on session change or unmount
