@@ -62,8 +62,10 @@
       -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;
       overscroll-behavior: none;
+      height: 100vh;
       height: 100dvh;
       width: 100vw;
+      max-width: 100%;
       /* Fix: Prevent all horizontal and vertical scrolling at the document level */
       overflow: hidden;
       -webkit-touch-callout: none;
@@ -71,8 +73,10 @@
     }
 
     #root {
+      height: 100vh;
       height: 100dvh;
       width: 100vw;
+      max-width: 100%;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -271,6 +275,12 @@
       display: block;
       min-width: fit-content;
       color: var(--text-primary);
+    }
+
+    /* Prevent oversized content from breaking layout on small screens */
+    .markdown-body img, .markdown-body video, .markdown-body iframe {
+      max-width: 100%;
+      height: auto;
     }
 
     .markdown-body :not(pre) > code {

@@ -76,7 +76,13 @@ export const getCurrentUser = async (): Promise<User | null> => {
 
     registerUserLocally(user);
     return user;
-  } catch (globalErr) {
+  } catch (globalErr: any) {
+    // iOS WebKit throws "TypeError: Load failed" for network errors — return null gracefully
+    const msg = (globalErr?.message || '').toLowerCase();
+    if (msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('network')) {
+      console.warn('Network error during auth check (iOS/mobile) — will retry on next interaction');
+      return null;
+    }
     console.error("Critical error in getCurrentUser:", globalErr);
     return null;
   }

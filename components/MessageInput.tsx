@@ -561,7 +561,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
               transform: 'translateY(-100%)',
               zIndex: 9999,
             }}
-            className="w-80 sm:w-[26rem] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl shadow-2xl py-2 flex"
+            className="w-[min(20rem,calc(100vw-2rem))] sm:w-[26rem] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl shadow-2xl py-2 flex"
           >
             <div className="w-48 sm:w-56 border-r border-[var(--border)] flex flex-col">
               <button 

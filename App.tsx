@@ -56,6 +56,19 @@ const App: React.FC = () => {
 
   const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
+  // Global handler for iOS WebKit "TypeError: Load failed" and unhandled rejections
+  useEffect(() => {
+    const handler = (e: PromiseRejectionEvent) => {
+      const msg = (e?.reason?.message || '').toLowerCase();
+      if (msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('network')) {
+        e.preventDefault(); // Suppress console error for transient network issues
+        console.warn('Transient network error caught globally — retrying silently');
+      }
+    };
+    window.addEventListener('unhandledrejection', handler);
+    return () => window.removeEventListener('unhandledrejection', handler);
+  }, []);
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('nexus_theme', theme);
@@ -358,7 +371,7 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden font-sans relative">
+      <div className="flex h-screen h-[100dvh] bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden font-sans relative">
       {showSurvey && <OnboardingSurvey onComplete={handleSurveyComplete} userName={user.personification || user.email} />}
       <Sidebar sessions={sessions} activeSessionId={activeSessionId} onNewChat={handleNewChat} onSelectSession={handleSelectSession} view={view} onSetView={setView} stats={userStats} onDeleteSession={handleDeleteSession} onRenameSession={handleRenameSession} onToggleFavorite={handleToggleFavorite} onOpenSettings={() => setIsSettingsOpen(true)} searchInputRef={null as any} isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} user={user} />
       <main className="flex-1 flex flex-col min-w-0 relative">

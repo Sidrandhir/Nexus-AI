@@ -56,8 +56,33 @@ const CODING_ADDENDUM = `
 - End coding answers with follow-up suggestions the user might want: "You could also explore: ..."
 `;
 
+const PRODUCT_ADDENDUM = `
+# PRODUCT & SHOPPING MODE
+When the user asks about products, shopping, items to buy, product recommendations, comparisons, deals, prices, or anything ecommerce-related:
+1. Use Google Search to find REAL, current product information with accurate prices and valid URLs.
+2. Present products inside a fenced code block with the language identifier "products" containing a JSON array.
+3. Each product object MUST have these fields:
+   - "name": Full product name
+   - "price": Price as a string with currency symbol (e.g. "$29.99", "₹1,499")
+   - "url": A real, working URL to buy or view the product (Amazon, Flipkart, Best Buy, official site, etc.)
+   - "store": Store or marketplace name (e.g. "Amazon", "Flipkart", "Best Buy")
+   - "rating": Rating string (e.g. "4.5/5") — omit if unknown
+   - "description": One-line summary, max 80 characters
+4. Include 4-6 products. Prioritize variety across stores when possible.
+5. After the products code block, add a brief 1-2 sentence recommendation or comparison summary.
+6. ONLY use this format for product/shopping queries. Do NOT use it for general questions.
+7. The JSON must be valid and parseable. No trailing commas. No comments inside the JSON.
+
+Example (use exactly this format):
+\`\`\`products
+[{"name":"Sony WH-1000XM5","price":"$348","url":"https://www.amazon.com/dp/B09XS7JWHH","store":"Amazon","rating":"4.7/5","description":"Industry-leading noise cancelling wireless headphones"}]
+\`\`\`
+`;
+
 const classifyIntent = (prompt: string, hasImage: boolean, hasDocs: boolean): QueryIntent => {
   const p = prompt.toLowerCase();
+  const productMarkers = ['buy', 'purchase', 'shop', 'product', 'recommend', 'best', 'cheapest', 'deal', 'discount', 'amazon', 'flipkart', 'ecommerce', 'e-commerce', 'shopping', 'order online', 'add to cart', 'price of', 'cost of', 'where to buy', 'top 5', 'top 10', 'vs', 'comparison', 'review', 'rating', 'worth buying', 'alternative'];
+  if (productMarkers.some(k => p.includes(k))) return 'live';
   const liveMarkers = ['weather', 'price', 'stock', 'news', 'today', 'current', 'latest', 'market', 'browse', 'status', 'who is', 'happening', 'live', 'internet', 'search', 'time', 'date'];
   if (liveMarkers.some(k => p.includes(k)) || hasImage) return 'live';
   const technicalMarkers = ['function', 'debug', 'code', 'error', 'repo', 'git', 'technical', 'architecture', 'formula', 'script', 'how to build'];
@@ -166,7 +191,7 @@ export const getAIResponse = async (
       let groundingChunks: GroundingChunk[] = [];
 
       const codingBlock = routing.intent === 'coding' ? CODING_ADDENDUM : '';
-      const finalSystemInstruction = `${SYSTEM_CORE}${codingBlock}\n${dateContext}\n[PREFERENCE]: ${personification}`;
+      const finalSystemInstruction = `${SYSTEM_CORE}${codingBlock}\n${PRODUCT_ADDENDUM}\n${dateContext}\n[PREFERENCE]: ${personification}`;
 
       if (onStreamChunk) {
         const result = await ai.models.generateContentStream({
@@ -222,10 +247,10 @@ export const getAIResponse = async (
       const msg = (err.message || "").toLowerCase();
       
       // Retry on transient / rate-limit errors
-      if (msg.includes('429') || msg.includes('quota') || msg.includes('resource exhausted') || msg.includes('rate limit') || msg.includes('503') || msg.includes('unavailable') || msg.includes('overloaded')) {
+      if (msg.includes('429') || msg.includes('quota') || msg.includes('resource exhausted') || msg.includes('rate limit') || msg.includes('503') || msg.includes('unavailable') || msg.includes('overloaded') || msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('network')) {
         if (attempt < MAX_RETRIES - 1) {
           const backoffMs = Math.min(1500 * Math.pow(2, attempt), 20000); // 1.5s → 3s → 6s → 12s
-          console.warn(`API rate limit hit (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${backoffMs}ms...`);
+          console.warn(`API error (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${backoffMs}ms...`);
           isRequestPending = false;
           await sleep(backoffMs);
           isRequestPending = true;

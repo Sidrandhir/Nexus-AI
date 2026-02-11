@@ -199,6 +199,60 @@ const MermaidBlock = ({ code }: { code: string }) => {
   );
 };
 
+const ProductGrid = memo(({ dataStr }: { dataStr: string }) => {
+  const products = useMemo(() => {
+    try {
+      const parsed = JSON.parse(dataStr);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [dataStr]);
+
+  if (!products.length) return null;
+
+  return (
+    <div className="my-6">
+      <div className="flex items-center gap-2 mb-4">
+        <svg className="w-5 h-5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+        </svg>
+        <span className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Products</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {products.map((p: any, i: number) => (
+          <a
+            key={i}
+            href={p.url || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex flex-col border border-[var(--border)] rounded-xl p-4 bg-[var(--bg-secondary)] hover:border-[var(--accent)]/50 hover:shadow-lg hover:shadow-[var(--accent)]/5 transition-all duration-200"
+          >
+            {p.image && (
+              <div className="w-full h-32 mb-3 rounded-lg overflow-hidden bg-white flex items-center justify-center">
+                <img src={p.image} alt={p.name} className="max-w-full max-h-full object-contain" loading="lazy" />
+              </div>
+            )}
+            <h4 className="text-sm font-bold text-[var(--text-primary)] line-clamp-2 mb-1 group-hover:text-[var(--accent)] transition-colors">{p.name}</h4>
+            {p.description && <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mb-2">{p.description}</p>}
+            <div className="flex items-center justify-between mt-auto pt-2">
+              <span className="text-base font-bold text-[var(--accent)]">{p.price}</span>
+              <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                {p.rating && <span>⭐ {p.rating}</span>}
+                {p.store && <span className="bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full text-[11px]">{p.store}</span>}
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity">
+              <span>View Product</span>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+});
+
 const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; className?: string }) => {
   const [copied, setCopied] = useState(false);
   const codeRef = useRef<HTMLElement>(null);
@@ -206,6 +260,7 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   const codeString = String(children).replace(/\n$/, '');
   if (className === 'language-chart') return <EnhancedChart dataStr={codeString} />;
   if (language === 'mermaid') return <MermaidBlock code={codeString} />;
+  if (language === 'products') return <ProductGrid dataStr={codeString} />;
 
   const handleCopy = () => {
     copyToClipboard(codeString);
