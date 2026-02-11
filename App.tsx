@@ -128,8 +128,8 @@ const App: React.FC = () => {
       }
       touchStartRef.current = null;
     };
-    window.addEventListener('touchstart', handleTouchStart);
-    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
     return () => {
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchend', handleTouchEnd);
@@ -147,14 +147,23 @@ const App: React.FC = () => {
       md += `### ${role}\n\n${msg.content}\n\n---\n\n`;
     });
     const blob = new Blob([md], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(activeSession.title || 'chat').replace(/[^a-z0-9]/gi, '_')}_export.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const filename = `${(activeSession.title || 'chat').replace(/[^a-z0-9]/gi, '_')}_export.md`;
+    // iOS-safe download: use navigator.share on iOS where <a download> is ignored
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS && navigator.share && navigator.canShare?.({ files: [new File([blob], filename)] })) {
+      navigator.share({ files: [new File([blob], filename, { type: blob.type })] }).catch(() => {
+        window.open(URL.createObjectURL(blob), '_blank');
+      });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   }, [activeSession]);
 
   const requestAIResponse = async (sessionId: string, currentHistory: Message[]) => {

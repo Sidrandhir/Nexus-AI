@@ -56,6 +56,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const [attachMenuPos, setAttachMenuPos] = useState<{ top: number; left: number } | null>(null);
 
+  // Check if SpeechRecognition API is available (not on Safari desktop)
+  const isSpeechSupported = typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
   // Focus input on session change or load (desktop only)
   useEffect(() => {
     if (!isDisabled && textareaRef.current && window.innerWidth >= 1024) {
@@ -212,7 +215,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   // Web Speech API for voice transcription
   const MAX_RESTARTS = 15;
-  const micStreamRef = useRef<MediaStream | null>(null);
 
   const startRecognition = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -273,11 +275,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
       isListeningRef.current = false;
       setIsListening(false);
       setInterimText('');
-      // Release mic stream on fatal error
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach(t => t.stop());
-        micStreamRef.current = null;
-      }
     };
 
     recognition.onend = () => {
@@ -294,11 +291,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
         isListeningRef.current = false;
         setIsListening(false);
         setInterimText('');
-        // Release mic stream when done
-        if (micStreamRef.current) {
-          micStreamRef.current.getTracks().forEach(t => t.stop());
-          micStreamRef.current = null;
-        }
       }
     };
 
@@ -308,10 +300,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
     } catch (e) {
       isListeningRef.current = false;
       setIsListening(false);
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach(t => t.stop());
-        micStreamRef.current = null;
-      }
     }
   }, []);
 
@@ -332,11 +320,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
       } catch {}
       recognitionRef.current = null;
     }
-    // Release the held mic stream
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach(t => t.stop());
-      micStreamRef.current = null;
-    }
     // Finalize: trim stale interim text, keep only committed text
     setInput(prev => prev.trim());
     finalTranscriptRef.current = '';
@@ -351,24 +334,28 @@ const MessageInput: React.FC<MessageInputProps> = ({
       finalTranscriptRef.current = '';
       restartCountRef.current = 0;
 
-      // Request mic permission first, then start recognition
-      // Keep the stream alive so the browser doesn't release the mic
-      if (navigator.mediaDevices?.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-          micStreamRef.current = stream; // Hold reference — don't stop it
-          isListeningRef.current = true;
-          setIsListening(true);
-          startRecognition();
-        }).catch(() => {
-          // Permission denied or no mic
-          isListeningRef.current = false;
-          setIsListening(false);
-        });
-      } else {
-        // Fallback: try starting directly (older browsers)
+      const beginListening = () => {
         isListeningRef.current = true;
         setIsListening(true);
         startRecognition();
+      };
+
+      // On mobile, getUserMedia holds an exclusive mic lock that blocks SpeechRecognition.
+      // On desktop, SpeechRecognition sometimes needs a prior getUserMedia permission grant.
+      // Solution: request permission, release the stream immediately, then start recognition.
+      const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+      if (!isMobile && navigator.mediaDevices?.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+          // Release immediately — we only needed the permission prompt
+          stream.getTracks().forEach(t => t.stop());
+          beginListening();
+        }).catch(() => {
+          // Permission denied — try starting directly anyway (Chrome may still allow it)
+          beginListening();
+        });
+      } else {
+        // Mobile or no getUserMedia — start directly, SpeechRecognition handles its own permissions
+        beginListening();
       }
     }
   }, [input, startRecognition, stopRecognition]);
@@ -384,10 +371,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
           recognitionRef.current.onerror = null;
           recognitionRef.current.abort();
         } catch {}
-      }
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach(t => t.stop());
-        micStreamRef.current = null;
       }
     };
   }, []);
@@ -823,8 +806,8 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
 
           {/* Right side buttons */}
           <div className="flex items-center gap-0.5 mb-0.5 flex-shrink-0">
-            {/* Voice transcription mic */}
-            {(!input.trim() || isListening) && !isDisabled && (
+            {/* Voice transcription mic — only shown when SpeechRecognition API exists */}
+            {isSpeechSupported && (!input.trim() || isListening) && !isDisabled && (
               <button 
                 onClick={toggleVoiceInput}
                 aria-label={isListening ? "Stop listening" : "Voice input"}

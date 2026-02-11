@@ -67,8 +67,10 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
     return () => clearInterval(typeInterval);
   }, [currentPrompt]);
 
-  // Cursor glow
+  // Cursor glow — skip on touch devices (no mouse)
   useEffect(() => {
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isTouchDevice) return;
     const handleMouseMove = (e: MouseEvent) => {
       const el = document.querySelector('.cursor-glow') as HTMLElement;
       if (el) { el.style.left = `${e.clientX}px`; el.style.top = `${e.clientY}px`; }

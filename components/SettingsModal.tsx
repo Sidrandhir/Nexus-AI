@@ -49,6 +49,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         if (prefs.response_format) setResponseStyle(prefs.response_format);
         if (prefs.language) setLanguage(prefs.language);
       });
+
+      // Escape key to close
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose();
+      };
+      document.addEventListener('keydown', handleKeyDown);
+
+      // Android back button — push a history entry so popstate fires
+      window.history.pushState({ modal: 'settings' }, '');
+      const handlePopState = () => onClose();
+      window.addEventListener('popstate', handlePopState);
+
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('popstate', handlePopState);
+      };
     }
     
     // Update progress bar widths from data attributes

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ChatSession, UserStats, User } from '../types';
 import { Icons } from '../constants';
 
@@ -41,6 +41,16 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+
+  // Escape key closes mobile sidebar overlay
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onToggle();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onToggle]);
 
   const filteredSessions = useMemo(() => {
     let list = [...sessions];

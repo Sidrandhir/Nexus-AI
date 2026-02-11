@@ -28,6 +28,46 @@ interface ChatAreaProps {
   onSuggestionClick?: (text: string) => void;
 }
 
+// Cross-platform clipboard helper — falls back to execCommand for insecure contexts (HTTP, WebViews)
+const copyToClipboard = (text: string) => {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+};
+const fallbackCopy = (text: string) => {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+};
+
+// iOS-safe file download — uses navigator.share on iOS Safari where <a download> is ignored
+const downloadFile = (blob: Blob, filename: string) => {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isIOS && navigator.share && navigator.canShare?.({ files: [new File([blob], filename)] })) {
+    navigator.share({ files: [new File([blob], filename, { type: blob.type })] }).catch(() => {
+      // User cancelled share — fallback to opening in new tab
+      window.open(URL.createObjectURL(blob), '_blank');
+    });
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+};
+
 const EnhancedTable = ({ children, ...props }: any) => {
   const [copied, setCopied] = useState(false);
   const tableRef = useRef<HTMLTableElement>(null);
@@ -38,7 +78,7 @@ const EnhancedTable = ({ children, ...props }: any) => {
       const cells = Array.from(row.querySelectorAll('th, td')) as HTMLElement[];
       return cells.map(cell => cell.innerText.trim()).join('\t');
     }).join('\n');
-    navigator.clipboard.writeText(tsv);
+    copyToClipboard(tsv);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -132,14 +172,7 @@ const MermaidBlock = ({ code }: { code: string }) => {
   const handleDownloadSvg = () => {
     if (!svg) return;
     const blob = new Blob([svg], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'diagram.svg';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadFile(blob, 'diagram.svg');
   };
 
   if (error) {
@@ -175,7 +208,7 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   if (language === 'mermaid') return <MermaidBlock code={codeString} />;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(codeString);
+    copyToClipboard(codeString);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -192,14 +225,7 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
     };
     const ext = extMap[language] || language || 'txt';
     const blob = new Blob([codeString], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `code.${ext}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadFile(blob, `code.${ext}`);
   };
 
   // Memoize syntax highlighting — only recompute when code content changes
@@ -323,15 +349,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
     if (synth.getVoices().length === 0) {
       // Voices not loaded yet — wait for voiceschanged
+      let spoken = false;
       const onVoicesChanged = () => {
         synth.removeEventListener('voiceschanged', onVoicesChanged);
-        doSpeak();
+        if (!spoken) { spoken = true; doSpeak(); }
       };
       synth.addEventListener('voiceschanged', onVoicesChanged);
       // Fallback: if voiceschanged never fires (Firefox), try after 500ms anyway
       setTimeout(() => {
         synth.removeEventListener('voiceschanged', onVoicesChanged);
-        if (!utteranceRef.current) doSpeak();
+        if (!spoken) { spoken = true; doSpeak(); }
       }, 500);
     } else {
       doSpeak();
@@ -373,7 +400,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   }, []);
 
   const handleCopyText = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+    copyToClipboard(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };

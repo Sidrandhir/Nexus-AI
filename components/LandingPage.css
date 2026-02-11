@@ -47,6 +47,7 @@
 .landing-page {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text-primary);
   overflow-x: hidden;
@@ -236,6 +237,7 @@
   position: relative;
   z-index: 1;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -376,6 +378,7 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   overflow: hidden;
+  -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   box-shadow: var(--shadow-card), 0 0 40px var(--accent-glow);
 }
@@ -941,4 +944,16 @@
   .momentum-stats { flex-direction: column; gap: 28px; }
   .m-stat-divider { display: none; }
   .cta-inner { padding: 36px 20px; border-radius: 18px; }
+}
+
+/* ═══════════════ ACCESSIBILITY ═══════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-page *, .landing-page *::before, .landing-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .cursor-glow, .particles-container, .bg-orb { display: none !important; }
 }

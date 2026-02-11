@@ -79,7 +79,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans">
+    <div className="min-h-screen min-h-[100dvh] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans">
 
       {/* Full-page content */}
       <div className="w-full max-w-[400px] z-10 flex flex-col items-center">
@@ -188,6 +188,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      autoComplete="name"
                       className="w-full bg-[var(--bg-primary)] border border-[var(--border)] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 rounded-lg py-2.5 px-3.5 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-secondary)]/50"
                       placeholder="Your name"
                     />
@@ -201,6 +202,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
                     className="w-full bg-[var(--bg-primary)] border border-[var(--border)] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 rounded-lg py-2.5 px-3.5 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-secondary)]/50"
                     placeholder="you@example.com"
                   />
@@ -229,6 +231,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      autoComplete={isLogin ? "current-password" : "new-password"}
                       className="w-full bg-[var(--bg-primary)] border border-[var(--border)] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 rounded-lg py-2.5 px-3.5 pr-11 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-secondary)]/50"
                       placeholder="••••••••"
                     />

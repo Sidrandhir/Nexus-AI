@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>NEXUS AI | Multi-Model Intelligence</title>
   <meta name="description" content="Professional AI routing to GPT-4, Claude, and Gemini.">
   
@@ -67,8 +67,6 @@
       /* Fix: Prevent all horizontal and vertical scrolling at the document level */
       overflow: hidden;
       -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
       transition: background-color 0.3s ease, color 0.3s ease;
     }
 
@@ -295,7 +293,7 @@
     ::-webkit-scrollbar-thumb { background: var(--text-secondary); opacity: 0.3; border-radius: 10px; }
     ::-webkit-scrollbar-track { background: transparent; }
     
-    .glass { background: var(--header-bg); backdrop-filter: blur(25px); border-bottom: 1px solid var(--border); }
+    .glass { background: var(--header-bg); -webkit-backdrop-filter: blur(25px); backdrop-filter: blur(25px); border-bottom: 1px solid var(--border); }
     .sidebar-transition { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
     @keyframes thought-pulse {
@@ -316,8 +314,8 @@
       position: relative;
     }
 
-    /* Performance: GPU-accelerated transitions */
-    *, *::before, *::after {
+    /* Performance: GPU-accelerated sidebar transition */
+    .sidebar-transition {
       -webkit-backface-visibility: hidden;
       backface-visibility: hidden;
     }
@@ -328,25 +326,19 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* GPU-accelerate common animated elements */
-    .sidebar-transition,
-    [class*="transition"],
-    [class*="animate"] {
-      will-change: transform, opacity;
-      transform: translateZ(0);
+    /* GPU-accelerate sidebar only */
+    .sidebar-transition {
+      will-change: transform;
     }
 
     /* Optimize scrolling containers */
     .overflow-y-auto, .overflow-x-auto, .overflow-auto {
       -webkit-overflow-scrolling: touch;
-      scroll-behavior: smooth;
     }
 
-    /* Content visibility for off-screen optimization */
-    main > div {
-      content-visibility: auto;
-      contain-intrinsic-size: auto 500px;
-    }
+    /* Safe area insets for iOS notch/home indicator */
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
   </style>
 <script type="importmap">
 {
