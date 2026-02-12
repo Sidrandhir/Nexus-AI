@@ -153,6 +153,41 @@ const MermaidBlock = ({ code }: { code: string }) => {
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string>('');
 
+  // Sanitize Mermaid code: escape unquoted parentheses inside node labels
+  // that Mermaid misinterprets as shape delimiters (e.g., "(Auth, User Profiles)")
+  const sanitizeMermaidCode = (raw: string): string => {
+    return raw.replace(
+      // Match node definitions like:  nodeId[Label text(something)] or nodeId(Label(something))
+      // Captures lines with node labels containing nested parens
+      /^(\s*\w[\w\d_-]*)\s*(\[|[\(])(.+?)(\]|[\)])(\s*$)/gm,
+      (match, nodeId, openShape, label, closeShape, trailing) => {
+        // If already quoted, leave it alone
+        if (label.startsWith('"') && label.endsWith('"')) return match;
+        // Escape inner parens inside the label text by wrapping in quotes
+        if (/\(/.test(label) && openShape === '[') {
+          return `${nodeId}${openShape}"${label}"${closeShape}${trailing}`;
+        }
+        return match;
+      }
+    ).replace(
+      // Fix unquoted labels with parens in bracket nodes across multiline: id["text<br>(details)"]
+      // Catch the common AI pattern: id[Text<br>(something, something)]
+      /(\w[\w\d_-]*)\[([^\]"]*\([^\]]*\)[^\]"]*)\]/g,
+      (match, nodeId, label) => {
+        if (label.startsWith('"') && label.endsWith('"')) return match;
+        return `${nodeId}["${label}"]`;
+      }
+    ).replace(
+      // Catch round-bracket shape nodes with inner parens: id(Text<br>(details))
+      // Mermaid can't handle nested () - wrap label in quotes
+      /(\w[\w\d_-]*)\(([^)"]*\([^)]*\)[^)"]*)\)/g,
+      (match, nodeId, label) => {
+        if (label.startsWith('"') && label.endsWith('"')) return match;
+        return `${nodeId}("${label}")`;
+      }
+    );
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -160,7 +195,8 @@ const MermaidBlock = ({ code }: { code: string }) => {
         const mermaid = (await import('mermaid')).default;
         mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
         const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
-        const { svg: rendered } = await mermaid.render(id, code);
+        const sanitized = sanitizeMermaidCode(code);
+        const { svg: rendered } = await mermaid.render(id, sanitized);
         if (!cancelled) setSvg(rendered);
       } catch (e: any) {
         if (!cancelled) setError(e.message || 'Invalid Mermaid syntax');
