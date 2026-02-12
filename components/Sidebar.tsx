@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, memo } from 'react';
 import { ChatSession, UserStats, User } from '../types';
 import { Icons } from '../constants';
 
@@ -38,9 +38,23 @@ const Sidebar: React.FC<SidebarProps> = ({
   user
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce search input to avoid filtering on every keystroke
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => setDebouncedSearch(val), 250);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, []);
 
   // Escape key closes mobile sidebar overlay
   useEffect(() => {
@@ -53,16 +67,16 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [isOpen, onToggle]);
 
   const filteredSessions = useMemo(() => {
-    let list = [...sessions];
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      list = list.filter(s => 
-        s.title.toLowerCase().includes(term) || 
-        s.messages.some(m => m.content.toLowerCase().includes(term))
+    let list = sessions;
+    if (debouncedSearch.trim()) {
+      const term = debouncedSearch.toLowerCase();
+      // Only search titles — message content search is too expensive and causes freeze
+      list = sessions.filter(s => 
+        s.title.toLowerCase().includes(term)
       );
     }
-    return list.slice(0, 100);
-  }, [sessions, searchTerm]);
+    return list.slice(0, 50);
+  }, [sessions, debouncedSearch]);
 
   const favorites = filteredSessions.filter(s => s.isFavorite);
   const regular = filteredSessions.filter(s => !s.isFavorite);
@@ -209,7 +223,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 type="text"
                 placeholder="Search chats..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={handleSearchChange}
                 className="w-full bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl py-3 pl-10 pr-4 text-[13px] font-medium outline-none focus:border-emerald-500/50"
               />
             </div>

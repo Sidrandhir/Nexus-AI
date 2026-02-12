@@ -4,11 +4,27 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { validateInput } from './validationService';
 
 export const api = {
+  _cachedUserId: null as string | null,
+  _cacheExpiry: 0,
+
   async _getUserId(): Promise<string> {
     if (!isSupabaseConfigured) throw new Error("Cloud Connectivity not established.");
+    // Cache user ID for 60s to avoid repeated getSession calls
+    const now = Date.now();
+    if (this._cachedUserId && now < this._cacheExpiry) return this._cachedUserId;
     const { data: { session } } = await supabase!.auth.getSession();
-    if (!session?.user?.id) throw new Error("Session expired. Please log in again.");
+    if (!session?.user?.id) {
+      this._cachedUserId = null;
+      throw new Error("Session expired. Please log in again.");
+    }
+    this._cachedUserId = session.user.id;
+    this._cacheExpiry = now + 60_000;
     return session.user.id;
+  },
+
+  clearUserCache() {
+    this._cachedUserId = null;
+    this._cacheExpiry = 0;
   },
 
   async getPreferences(): Promise<any> {
@@ -41,10 +57,14 @@ export const api = {
     }
   },
 
-  async getConversations(): Promise<ChatSession[]> {
+  async getConversations(limit = 50, offset = 0): Promise<ChatSession[]> {
     try {
       const userId = await this._getUserId();
-      const { data, error } = await supabase!.from('conversations').select('*').eq('user_id', userId).order('last_modified', { ascending: false });
+      const { data, error } = await supabase!.from('conversations')
+        .select('id, user_id, title, created_at, last_modified, is_favorite, preferred_model')
+        .eq('user_id', userId)
+        .order('last_modified', { ascending: false })
+        .range(offset, offset + limit - 1);
       if (error) throw error;
       return (data || []).map(row => ({
         id: row.id,
@@ -87,8 +107,12 @@ export const api = {
     await supabase!.from('conversations').update(dbUpdates).eq('id', id);
   },
 
-  async getMessages(conversationId: string): Promise<Message[]> {
-    const { data } = await supabase!.from('messages').select('*').eq('conversation_id', conversationId).order('timestamp', { ascending: true });
+  async getMessages(conversationId: string, limit = 100): Promise<Message[]> {
+    const { data } = await supabase!.from('messages')
+      .select('id, role, content, model, timestamp, image_data, documents, conversation_id, tokens_used, input_tokens, output_tokens, grounding_chunks, metadata')
+      .eq('conversation_id', conversationId)
+      .order('timestamp', { ascending: true })
+      .limit(limit);
     return (data || []).map(row => ({
       id: row.id,
       role: row.role,
@@ -162,5 +186,6 @@ export const api = {
   async purgeAllConversations(): Promise<void> {
     const userId = await this._getUserId();
     await supabase!.from('conversations').delete().eq('user_id', userId);
+    this.clearUserCache();
   }
 };

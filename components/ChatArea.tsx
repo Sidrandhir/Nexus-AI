@@ -316,6 +316,172 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   );
 });
 
+// ── Memoized message component — prevents re-rendering unchanged messages during streaming ──
+interface MessageItemProps {
+  msg: Message;
+  isLast: boolean;
+  isLoading: boolean;
+  copiedId: string | null;
+  editingId: string | null;
+  editContent: string;
+  speakingMsgId: string | null;
+  onCopyText: (text: string, id: string) => void;
+  onStartEdit: (id: string, content: string) => void;
+  onCancelEdit: () => void;
+  onSubmitEdit: (id: string) => void;
+  onEditContentChange: (val: string) => void;
+  onRegenerate: (id: string) => void;
+  onFeedback: (id: string, fb: 'good' | 'bad' | null) => void;
+  onSpeak: (id: string, text: string) => void;
+  onSuggestionClick?: (text: string) => void;
+  markdownComponents: any;
+  remarkPlugins: any;
+}
+
+const MessageItem = memo(({ msg, isLast, isLoading, copiedId, editingId, editContent, speakingMsgId, onCopyText, onStartEdit, onCancelEdit, onSubmitEdit, onEditContentChange, onRegenerate, onFeedback, onSpeak, onSuggestionClick, markdownComponents, remarkPlugins }: MessageItemProps) => {
+  return (
+    <div className={`group flex flex-col gap-3 animate-in fade-in duration-600 ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-full`}>
+      <div className="relative max-w-full sm:max-w-[92%] w-auto min-w-0">
+        <div className={`p-6 sm:p-7 rounded-2xl border transition-all ${msg.role === 'user' ? 'bg-[var(--bg-tertiary)]/30 border-[var(--border)] text-[var(--text-primary)] shadow-sm' : 'bg-transparent border-transparent text-[var(--text-primary)]'} overflow-hidden`}>
+          {msg.documents && msg.documents.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {msg.documents.map((doc, di) => {
+                const ext = doc.title.split('.').pop()?.toLowerCase() || '';
+                const isZip = ext === 'zip';
+                const fileInfo: Record<string, { color: string; label: string; icon: string }> = {
+                  pdf: { color: 'text-red-400 bg-red-500/10 border-red-500/20', label: 'PDF', icon: '📄' },
+                  docx: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'DOC', icon: '📝' },
+                  doc: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'DOC', icon: '📝' },
+                  xlsx: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'XLS', icon: '📊' },
+                  xls: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'XLS', icon: '📊' },
+                  csv: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'CSV', icon: '📊' },
+                  zip: { color: 'text-orange-400 bg-orange-500/10 border-orange-500/20', label: 'ZIP', icon: '📦' },
+                  json: { color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', label: 'JSON', icon: '{ }' },
+                  md: { color: 'text-purple-400 bg-purple-500/10 border-purple-500/20', label: 'MD', icon: '📑' },
+                };
+                const info = fileInfo[ext] || { color: 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border-[var(--border)]', label: 'TXT', icon: '📄' };
+                const zipFileCount = isZip ? (doc.content.match(/--- File: /g)?.length || 0) : 0;
+                return (
+                  <div key={di} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${info.color} min-w-[120px] max-w-[220px]`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${info.color}`}>
+                      <span className="text-xs">{info.icon}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-[var(--text-primary)] truncate">{doc.title}</p>
+                      <p className="text-[11px] text-[var(--text-secondary)]">{isZip ? `${zipFileCount} file${zipFileCount !== 1 ? 's' : ''}` : `${info.label} file`}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {isLoading && msg.role === 'assistant' && !msg.content ? (
+            <div className="flex items-center gap-3 py-4">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse" />
+                <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-75" />
+                <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-150" />
+              </div>
+              <span className="text-[13px] sm:text-sm font-medium text-[var(--text-secondary)] animate-pulse">Thinking...</span>
+            </div>
+          ) : editingId === msg.id ? (
+            <div className="space-y-4">
+              <textarea value={editContent} onChange={(e) => onEditContentChange(e.target.value)} aria-label="Edit message content" placeholder="Edit your message..." className="w-full bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl p-5 text-[15px] sm:text-base focus:outline-none focus:border-[var(--accent)] transition-all leading-relaxed text-[var(--text-primary)] shadow-inner" rows={3} />
+              <div className="flex gap-2"><button onClick={() => onSubmitEdit(msg.id)} className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-xl text-[13px] sm:text-sm font-semibold active:scale-95 transition-all shadow-lg shadow-[var(--accent)]/10">Update</button><button onClick={onCancelEdit} className="px-5 py-2.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] rounded-xl text-[13px] sm:text-sm font-semibold border border-[var(--border)] active:scale-95 transition-all">Cancel</button></div>
+            </div>
+          ) : (
+            <div className="markdown-body"><ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>{msg.content}</ReactMarkdown></div>
+          )}
+          {msg.image && <div className="mt-8 rounded-xl overflow-hidden border border-[var(--border)] shadow-xl"><img src={`data:${msg.image.mimeType};base64,${msg.image.inlineData.data}`} alt="Context Attached" className="max-w-full h-auto" /></div>}
+          {msg.groundingChunks && msg.groundingChunks.length > 0 && (
+            <div className="mt-10 pt-6 border-t border-[var(--border)] animate-in fade-in duration-700">
+              <div className="flex items-center gap-2 mb-4">
+                 <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {msg.groundingChunks.map((chunk: GroundingChunk, i: number) => {
+                  const uri = chunk.web?.uri || chunk.maps?.uri;
+                  const title = chunk.web?.title || chunk.maps?.title;
+                  if (!uri) return null;
+                  return (
+                    <a key={i} href={uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]/40 border border-[var(--border)] hover:border-[var(--accent)]/50 transition-all group shadow-sm active:scale-[0.98]">
+                      <span className="text-[12px] sm:text-[13px] font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] truncate max-w-[180px]">{title || "Source"}</span>
+                      <Icons.PanelLeftOpen className="w-2 h-2 opacity-30 group-hover:opacity-100 rotate-180 transition-opacity" />
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+        {isLast && msg.role === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && !isLoading && (
+          <div className="mt-8 flex flex-col gap-3 items-start animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <div className="flex flex-wrap gap-2">{msg.suggestions.map((suggestion, i) => (<button key={i} onClick={() => onSuggestionClick?.(suggestion)} className="px-4 py-2.5 rounded-xl bg-[var(--bg-tertiary)]/20 border border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all text-[13px] sm:text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] text-left active:scale-[0.97] shadow-sm">{suggestion}</button>))}</div>
+          </div>
+        )}
+        <div className={`mt-2 flex items-center gap-1 ${msg.role === 'assistant' ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity ${msg.role === 'user' ? 'justify-end pr-2' : 'pl-2'}`}>
+          <button onClick={() => onCopyText(msg.content, msg.id)} aria-label="Copy message" data-nexus-tooltip={copiedId === msg.id ? 'Copied' : 'Copy'} className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all">{copiedId === msg.id ? <Icons.Check className="w-3.5 h-3.5 text-[var(--accent)]" /> : <Icons.Copy className="w-3.5 h-3.5" />}</button>
+          {msg.role === 'user' && <button onClick={() => onStartEdit(msg.id, msg.content)} aria-label="Edit message" data-nexus-tooltip="Edit" className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all"><Icons.Edit className="w-3.5 h-3.5" /></button>}
+          {msg.role === 'assistant' && (
+            <>
+              <button onClick={() => onRegenerate(msg.id)} aria-label="Regenerate response" data-nexus-tooltip="Retry" className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all"><Icons.RotateCcw className="w-3.5 h-3.5" /></button>
+              <button 
+                onClick={() => onSpeak(msg.id, msg.content)} 
+                aria-label={speakingMsgId === msg.id ? "Stop speaking" : "Read aloud"} 
+                data-nexus-tooltip={speakingMsgId === msg.id ? "Stop" : "Read aloud"} 
+                className={`p-2 rounded-xl transition-all ${
+                  speakingMsgId === msg.id 
+                    ? 'text-[var(--accent)] bg-[var(--accent)]/10 animate-pulse' 
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
+                }`}
+              >
+                {speakingMsgId === msg.id ? <Icons.VolumeX className="w-3.5 h-3.5" /> : <Icons.Volume2 className="w-3.5 h-3.5" />}
+              </button>
+              <div className="w-px h-4 bg-[var(--border)] mx-0.5" />
+              <button 
+                onClick={() => onFeedback(msg.id, msg.feedback === 'good' ? null : 'good')} 
+                aria-label="Good response" 
+                data-nexus-tooltip="Good response" 
+                className={`p-2 rounded-xl transition-all ${
+                  msg.feedback === 'good' 
+                    ? 'text-[var(--accent)] bg-[var(--accent)]/10' 
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Icons.ThumbsUp className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                onClick={() => onFeedback(msg.id, msg.feedback === 'bad' ? null : 'bad')} 
+                aria-label="Bad response" 
+                data-nexus-tooltip="Bad response" 
+                className={`p-2 rounded-xl transition-all ${
+                  msg.feedback === 'bad' 
+                    ? 'text-red-400 bg-red-500/10' 
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Icons.ThumbsDown className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  // Custom equality — only re-render when THIS message's data actually changes
+  if (prev.msg.content !== next.msg.content) return false;
+  if (prev.msg.feedback !== next.msg.feedback) return false;
+  if (prev.msg.suggestions !== next.msg.suggestions) return false;
+  if (prev.isLast !== next.isLast) return false;
+  if (prev.isLoading !== next.isLoading) return false;
+  if ((prev.copiedId === prev.msg.id) !== (next.copiedId === next.msg.id)) return false;
+  if ((prev.editingId === prev.msg.id) !== (next.editingId === next.msg.id)) return false;
+  if (prev.editingId === prev.msg.id && prev.editContent !== next.editContent) return false;
+  if ((prev.speakingMsgId === prev.msg.id) !== (next.speakingMsgId === next.msg.id)) return false;
+  return true;
+});
+
 const ChatArea: React.FC<ChatAreaProps> = ({ 
   session, 
   isLoading, 
@@ -454,18 +620,27 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     });
   }, []);
 
-  const handleCopyText = (text: string, id: string) => {
+  const handleCopyText = useCallback((text: string, id: string) => {
     copyToClipboard(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  };
+  }, []);
 
-  const submitEdit = (id: string) => {
+  const handleStartEdit = useCallback((id: string, content: string) => {
+    setEditingId(id);
+    setEditContent(content);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingId(null);
+  }, []);
+
+  const submitEdit = useCallback((id: string) => {
     if (editContent.trim()) {
       onEditMessage(id, editContent.trim());
       setEditingId(null);
     }
-  };
+  }, [editContent, onEditMessage]);
 
   const getModelDisplayName = (model?: AIModel) => {
     if (!model) return "Nexus AI";
@@ -517,135 +692,27 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           )}
           {messages.map((msg, idx) => (
-            <div key={msg.id} className={`group flex flex-col gap-3 animate-in fade-in duration-600 ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-full`}>
-
-              <div className="relative max-w-full sm:max-w-[92%] w-auto min-w-0">
-                <div className={`p-6 sm:p-7 rounded-2xl border transition-all ${msg.role === 'user' ? 'bg-[var(--bg-tertiary)]/30 border-[var(--border)] text-[var(--text-primary)] shadow-sm' : 'bg-transparent border-transparent text-[var(--text-primary)]'} overflow-hidden`}>
-                  {msg.documents && msg.documents.length > 0 && (
-                    <div className="mb-4 flex flex-wrap gap-2">
-                      {msg.documents.map((doc, di) => {
-                        const ext = doc.title.split('.').pop()?.toLowerCase() || '';
-                        const isZip = ext === 'zip';
-                        const fileInfo: Record<string, { color: string; label: string; icon: string }> = {
-                          pdf: { color: 'text-red-400 bg-red-500/10 border-red-500/20', label: 'PDF', icon: '📄' },
-                          docx: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'DOC', icon: '📝' },
-                          doc: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'DOC', icon: '📝' },
-                          xlsx: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'XLS', icon: '📊' },
-                          xls: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'XLS', icon: '📊' },
-                          csv: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'CSV', icon: '📊' },
-                          zip: { color: 'text-orange-400 bg-orange-500/10 border-orange-500/20', label: 'ZIP', icon: '📦' },
-                          json: { color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', label: 'JSON', icon: '{ }' },
-                          md: { color: 'text-purple-400 bg-purple-500/10 border-purple-500/20', label: 'MD', icon: '📑' },
-                        };
-                        const info = fileInfo[ext] || { color: 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border-[var(--border)]', label: 'TXT', icon: '📄' };
-                        const zipFileCount = isZip ? (doc.content.match(/--- File: /g)?.length || 0) : 0;
-                        
-                        return (
-                          <div key={di} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${info.color} min-w-[120px] max-w-[220px]`}>
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${info.color}`}>
-                              <span className="text-xs">{info.icon}</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-[var(--text-primary)] truncate">{doc.title}</p>
-                              <p className="text-[11px] text-[var(--text-secondary)]">{isZip ? `${zipFileCount} file${zipFileCount !== 1 ? 's' : ''}` : `${info.label} file`}</p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {isLoading && msg.role === 'assistant' && !msg.content ? (
-                    <div className="flex items-center gap-3 py-4">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse" />
-                        <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-75" />
-                        <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-150" />
-                      </div>
-                      <span className="text-[13px] sm:text-sm font-medium text-[var(--text-secondary)] animate-pulse">Thinking...</span>
-                    </div>
-                  ) : editingId === msg.id ? (
-                    <div className="space-y-4">
-                      <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} aria-label="Edit message content" placeholder="Edit your message..." className="w-full bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl p-5 text-[15px] sm:text-base focus:outline-none focus:border-[var(--accent)] transition-all leading-relaxed text-[var(--text-primary)] shadow-inner" rows={3} />
-                      <div className="flex gap-2"><button onClick={() => submitEdit(msg.id)} className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-xl text-[13px] sm:text-sm font-semibold active:scale-95 transition-all shadow-lg shadow-[var(--accent)]/10">Update</button><button onClick={() => setEditingId(null)} className="px-5 py-2.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] rounded-xl text-[13px] sm:text-sm font-semibold border border-[var(--border)] active:scale-95 transition-all">Cancel</button></div>
-                    </div>
-                  ) : (
-                    <div className="markdown-body"><ReactMarkdown remarkPlugins={remarkPluginsStable} components={markdownComponents}>{msg.content}</ReactMarkdown></div>
-                  )}
-                  {msg.image && <div className="mt-8 rounded-xl overflow-hidden border border-[var(--border)] shadow-xl"><img src={`data:${msg.image.mimeType};base64,${msg.image.inlineData.data}`} alt="Context Attached" className="max-w-full h-auto" /></div>}
-                  {msg.groundingChunks && msg.groundingChunks.length > 0 && (
-                    <div className="mt-10 pt-6 border-t border-[var(--border)] animate-in fade-in duration-700">
-                      <div className="flex items-center gap-2 mb-4">
-                         <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {msg.groundingChunks.map((chunk: GroundingChunk, i: number) => {
-                          const uri = chunk.web?.uri || chunk.maps?.uri;
-                          const title = chunk.web?.title || chunk.maps?.title;
-                          if (!uri) return null;
-                          return (
-                            <a key={i} href={uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]/40 border border-[var(--border)] hover:border-[var(--accent)]/50 transition-all group shadow-sm active:scale-[0.98]">
-                              <span className="text-[12px] sm:text-[13px] font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] truncate max-w-[180px]">{title || "Source"}</span>
-                              <Icons.PanelLeftOpen className="w-2 h-2 opacity-30 group-hover:opacity-100 rotate-180 transition-opacity" />
-                            </a>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {idx === messages.length - 1 && msg.role === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && !isLoading && (
-                  <div className="mt-8 flex flex-col gap-3 items-start animate-in fade-in slide-in-from-bottom-2 duration-700">
-                    <div className="flex flex-wrap gap-2">{msg.suggestions.map((suggestion, i) => (<button key={i} onClick={() => onSuggestionClick?.(suggestion)} className="px-4 py-2.5 rounded-xl bg-[var(--bg-tertiary)]/20 border border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all text-[13px] sm:text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] text-left active:scale-[0.97] shadow-sm">{suggestion}</button>))}</div>
-                  </div>
-                )}
-                <div className={`mt-2 flex items-center gap-1 ${msg.role === 'assistant' ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity ${msg.role === 'user' ? 'justify-end pr-2' : 'pl-2'}`}>
-                  <button onClick={() => handleCopyText(msg.content, msg.id)} aria-label="Copy message" data-nexus-tooltip={copiedId === msg.id ? 'Copied' : 'Copy'} className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all">{copiedId === msg.id ? <Icons.Check className="w-3.5 h-3.5 text-[var(--accent)]" /> : <Icons.Copy className="w-3.5 h-3.5" />}</button>
-                  {msg.role === 'user' && <button onClick={() => { setEditingId(msg.id); setEditContent(msg.content); }} aria-label="Edit message" data-nexus-tooltip="Edit" className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all"><Icons.Edit className="w-3.5 h-3.5" /></button>}
-                  {msg.role === 'assistant' && (
-                    <>
-                      <button onClick={() => onRegenerate(msg.id)} aria-label="Regenerate response" data-nexus-tooltip="Retry" className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all"><Icons.RotateCcw className="w-3.5 h-3.5" /></button>
-                      <button 
-                        onClick={() => speakMessage(msg.id, msg.content)} 
-                        aria-label={speakingMsgId === msg.id ? "Stop speaking" : "Read aloud"} 
-                        data-nexus-tooltip={speakingMsgId === msg.id ? "Stop" : "Read aloud"} 
-                        className={`p-2 rounded-xl transition-all ${
-                          speakingMsgId === msg.id 
-                            ? 'text-[var(--accent)] bg-[var(--accent)]/10 animate-pulse' 
-                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
-                        }`}
-                      >
-                        {speakingMsgId === msg.id ? <Icons.VolumeX className="w-3.5 h-3.5" /> : <Icons.Volume2 className="w-3.5 h-3.5" />}
-                      </button>
-                      <div className="w-px h-4 bg-[var(--border)] mx-0.5" />
-                      <button 
-                        onClick={() => onFeedback(msg.id, msg.feedback === 'good' ? null : 'good')} 
-                        aria-label="Good response" 
-                        data-nexus-tooltip="Good response" 
-                        className={`p-2 rounded-xl transition-all ${
-                          msg.feedback === 'good' 
-                            ? 'text-[var(--accent)] bg-[var(--accent)]/10' 
-                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
-                        }`}
-                      >
-                        <Icons.ThumbsUp className="w-3.5 h-3.5" />
-                      </button>
-                      <button 
-                        onClick={() => onFeedback(msg.id, msg.feedback === 'bad' ? null : 'bad')} 
-                        aria-label="Bad response" 
-                        data-nexus-tooltip="Bad response" 
-                        className={`p-2 rounded-xl transition-all ${
-                          msg.feedback === 'bad' 
-                            ? 'text-red-400 bg-red-500/10' 
-                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
-                        }`}
-                      >
-                        <Icons.ThumbsDown className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+            <MessageItem
+              key={msg.id}
+              msg={msg}
+              isLast={idx === messages.length - 1}
+              isLoading={isLoading}
+              copiedId={copiedId}
+              editingId={editingId}
+              editContent={editContent}
+              speakingMsgId={speakingMsgId}
+              onCopyText={handleCopyText}
+              onStartEdit={handleStartEdit}
+              onCancelEdit={handleCancelEdit}
+              onSubmitEdit={submitEdit}
+              onEditContentChange={setEditContent}
+              onRegenerate={onRegenerate}
+              onFeedback={onFeedback}
+              onSpeak={speakMessage}
+              onSuggestionClick={onSuggestionClick}
+              markdownComponents={markdownComponents}
+              remarkPlugins={remarkPluginsStable}
+            />
           ))}
           {isLoading && !messages.some(m => m.id.startsWith('assistant-')) && (
             <div className="flex flex-col gap-4 items-start animate-in fade-in duration-500">

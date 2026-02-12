@@ -14,6 +14,8 @@ const LiveVoiceOverlay: React.FC<LiveVoiceOverlayProps> = ({ onClose, isOpen }) 
   const [transcription, setTranscription] = useState<string[]>([]);
   
   const audioContextRef = useRef<AudioContext | null>(null);
+  const inputAudioContextRef = useRef<AudioContext | null>(null);
+  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const sessionRef = useRef<any>(null);
   const nextStartTimeRef = useRef(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
@@ -49,6 +51,18 @@ const LiveVoiceOverlay: React.FC<LiveVoiceOverlayProps> = ({ onClose, isOpen }) 
       microphoneStreamRef.current = null;
     }
 
+    // Disconnect scriptProcessor to stop audio processing callbacks
+    if (scriptProcessorRef.current) {
+      try { scriptProcessorRef.current.disconnect(); } catch(e) {}
+      scriptProcessorRef.current = null;
+    }
+
+    // Close BOTH audio contexts (input + output) to free system resources
+    if (inputAudioContextRef.current) {
+      inputAudioContextRef.current.close().catch(() => {});
+      inputAudioContextRef.current = null;
+    }
+
     if (audioContextRef.current) {
       audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
@@ -64,6 +78,7 @@ const LiveVoiceOverlay: React.FC<LiveVoiceOverlayProps> = ({ onClose, isOpen }) 
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       audioContextRef.current = outputCtx;
+      inputAudioContextRef.current = inputCtx;
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       microphoneStreamRef.current = stream;
@@ -76,6 +91,7 @@ const LiveVoiceOverlay: React.FC<LiveVoiceOverlayProps> = ({ onClose, isOpen }) 
             setStatus('active');
             const source = inputCtx.createMediaStreamSource(stream);
             const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
+            scriptProcessorRef.current = scriptProcessor;
             scriptProcessor.onaudioprocess = (e) => {
               const inputData = e.inputBuffer.getChannelData(0);
               const int16 = new Int16Array(inputData.length);
@@ -98,6 +114,8 @@ const LiveVoiceOverlay: React.FC<LiveVoiceOverlayProps> = ({ onClose, isOpen }) 
               source.start(nextStartTimeRef.current);
               nextStartTimeRef.current += buffer.duration;
               sourcesRef.current.add(source);
+              // Clean up finished sources to prevent memory leak
+              source.onended = () => { sourcesRef.current.delete(source); };
             }
           },
           onerror: (e) => setErrorMessage(e.message || 'Error'),

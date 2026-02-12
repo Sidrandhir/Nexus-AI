@@ -20,6 +20,19 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
+      },
+      build: {
+        // Split heavy vendor libraries into separate chunks for better caching & loading
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              'vendor-react': ['react', 'react-dom'],
+              'vendor-markdown': ['react-markdown', 'remark-gfm'],
+              'vendor-charts': ['recharts'],
+              'vendor-supabase': ['@supabase/supabase-js'],
+            }
+          }
+        }
       }
     };
 });

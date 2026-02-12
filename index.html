@@ -14,10 +14,19 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Nexus AI">
   
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Preconnect to critical origins for faster resource loading -->
+  <link rel="preconnect" href="https://esm.sh" crossorigin>
+  <link rel="dns-prefetch" href="https://esm.sh">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <!-- Preload critical font to prevent FOUT/CLS -->
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" as="style">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Tailwind: load async to unblock rendering (fixes LCP) -->
+  <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
+  <script src="https://cdn.tailwindcss.com" defer></script>
   <style>
     :root {
       --bg-primary: #171717;
@@ -80,7 +89,27 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      /* CLS fix: reserve space for the main layout immediately */
+      contain: layout style;
     }
+
+    /* CLS fix: prevent layout shift from auth spinner */
+    #root:empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-primary);
+    }
+    #root:empty::after {
+      content: '';
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(16, 163, 127, 0.2);
+      border-top-color: #10a37f;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Professional Nexus Tooltip System */
     [data-nexus-tooltip] {
@@ -328,6 +357,8 @@
     .sidebar-transition {
       -webkit-backface-visibility: hidden;
       backface-visibility: hidden;
+      /* CLS fix: reserve sidebar width to prevent layout shift */
+      contain: layout style;
     }
 
     /* Smooth touch interactions */
@@ -344,6 +375,20 @@
     /* Optimize scrolling containers */
     .overflow-y-auto, .overflow-x-auto, .overflow-auto {
       -webkit-overflow-scrolling: touch;
+    }
+
+    /* INP fix: off-screen messages skip rendering work */
+    .gap-12 > div {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 120px;
+    }
+
+    /* CLS fix: header has fixed height */
+    header.glass {
+      min-height: 56px;
+    }
+    @media (min-width: 640px) {
+      header.glass { min-height: 64px; }
     }
 
     /* Safe area insets for iOS notch/home indicator */

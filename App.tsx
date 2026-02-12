@@ -1,18 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import MessageInput from './components/MessageInput';
-import Dashboard from './components/Dashboard';
-import Pricing from './components/Pricing';
-import Billing from './components/Billing';
-import AuthPage from './components/AuthPage';
-import LandingPage from './components/LandingPage';
-import AdminDashboard from './components/AdminDashboard';
-import SettingsModal from './components/SettingsModal';
-import MobileOnboarding from './components/MobileOnboarding';
-import OnboardingSurvey from './components/OnboardingSurvey';
-import ResetPasswordPage from './components/ResetPasswordPage';
 import Toast, { ToastMessage } from './components/Toast';
 import { ChatSession, Message, RouterResult, UserStats, User, AIModel, MessageImage, AttachedDocument } from './types';
 import { getAIResponse, generateChatTitle, routePrompt, generateFollowUpSuggestions } from './services/aiService';
@@ -22,6 +12,21 @@ import { getAdminStats } from './services/analyticsService';
 import { api } from './services/apiService';
 import { Icons } from './constants';
 import { isSupabaseConfigured as initialConfigured, supabase } from './services/supabaseClient';
+
+// Lazy-load heavy components that aren't needed on initial render
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Pricing = lazy(() => import('./components/Pricing'));
+const Billing = lazy(() => import('./components/Billing'));
+const AuthPage = lazy(() => import('./components/AuthPage'));
+const LandingPage = lazy(() => import('./components/LandingPage'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const MobileOnboarding = lazy(() => import('./components/MobileOnboarding'));
+const OnboardingSurvey = lazy(() => import('./components/OnboardingSurvey'));
+const ResetPasswordPage = lazy(() => import('./components/ResetPasswordPage'));
+
+// Minimal fallback for lazy components
+const LazyFallback = () => <div className="flex items-center justify-center p-8"><div className="w-6 h-6 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" /></div>;
 
 const App: React.FC = () => {
   const [configured] = useState(initialConfigured);
@@ -119,10 +124,18 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      getStats(user.id).then(setUserStats);
-      api.getConversations().then(async (convs) => {
-        setSessions(convs);
-        if (convs.length > 0) handleSelectSession(convs[0].id);
+      // Load stats in background — don't block UI
+      getStats(user.id).then(s => startTransition(() => setUserStats(s)));
+      // Load conversations with limit, then select first one
+      api.getConversations(50).then(async (convs) => {
+        startTransition(() => setSessions(convs));
+        if (convs.length > 0) {
+          setActiveSessionId(convs[0].id);
+          // Load messages for first conversation separately
+          api.getMessages(convs[0].id, 100).then(m => {
+            startTransition(() => setSessions(p => p.map(s => s.id === convs[0].id ? { ...s, messages: m } : s)));
+          });
+        }
       });
     }
   }, [user]);
@@ -197,13 +210,21 @@ const App: React.FC = () => {
 
     let accumulatedText = "";
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastFlushedLength = 0;
 
     const flushToUI = () => {
+      // Skip flush if text hasn't grown since last flush (avoids redundant renders)
+      if (accumulatedText.length === lastFlushedLength) { flushTimer = null; return; }
+      lastFlushedLength = accumulatedText.length;
       const snapshot = accumulatedText;
-      setSessions(prev => prev.map(s => s.id === sessionId ? {
-        ...s,
-        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: snapshot } : m)
-      } : s));
+      // Use startTransition to mark streaming updates as non-urgent
+      // This keeps the UI responsive to user input during streaming
+      startTransition(() => {
+        setSessions(prev => prev.map(s => s.id === sessionId ? {
+          ...s,
+          messages: s.messages.map(m => m.id === assistantId ? { ...m, content: snapshot } : m)
+        } : s));
+      });
       flushTimer = null;
     };
 
@@ -218,19 +239,20 @@ const App: React.FC = () => {
         userSettings.personification,
         (chunk) => {
           accumulatedText += chunk;
-          // Throttle UI updates to ~8/sec — prevents markdown re-parse jank
+          // Throttle UI updates to ~3/sec — prevents markdown re-parse jank
           if (!flushTimer) {
-            flushTimer = setTimeout(flushToUI, 120);
+            flushTimer = setTimeout(flushToUI, 300);
           }
         },
         abortControllerRef.current.signal
       );
 
-      // Final flush to ensure all accumulated text is rendered
+      // Final flush — use POST-PROCESSED content, not raw streamed text
+      // This ensures filler removal, trailing question stripping, etc. are visible
       if (flushTimer) clearTimeout(flushTimer);
       setSessions(prev => prev.map(s => s.id === sessionId ? {
         ...s,
-        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: accumulatedText } : m)
+        messages: s.messages.map(m => m.id === assistantId ? { ...m, content: response.content } : m)
       } : s));
 
       // Fire suggestions in background — don't block the main response
@@ -256,14 +278,16 @@ const App: React.FC = () => {
       // Apply suggestions when they arrive (non-blocking)
       suggestionsPromise.then(suggestions => {
         if (suggestions.length > 0) {
-          setSessions(prev => prev.map(s => s.id === sessionId ? {
-            ...s,
-            messages: s.messages.map(m => m.id === savedAssistantMsg.id ? { ...m, suggestions } : m)
-          } : s));
+          startTransition(() => {
+            setSessions(prev => prev.map(s => s.id === sessionId ? {
+              ...s,
+              messages: s.messages.map(m => m.id === savedAssistantMsg.id ? { ...m, suggestions } : m)
+            } : s));
+          });
         }
       });
 
-      getStats(user.id).then(setUserStats);
+      getStats(user.id).then(s => startTransition(() => setUserStats(s)));
 
       // Generate title in background — don't block UI
       if (currentHistory.length === 1 && (activeSession?.title === "New Chat" || !activeSession?.title)) {
@@ -327,13 +351,13 @@ const App: React.FC = () => {
     } : s));
   };
 
-  const handleNewChat = async () => { if (!user) return; const s = await api.createConversation("New Chat"); setSessions(p => [s, ...p]); setActiveSessionId(s.id); setView('chat'); if (window.innerWidth < 1024) setIsSidebarOpen(false); };
-  const handleSelectSession = (id: string) => { setActiveSessionId(id); api.getMessages(id).then(m => setSessions(p => p.map(s => s.id === id ? { ...s, messages: m } : s))); };
-  const handleDeleteSession = (id: string) => api.deleteConversation(id).then(() => { setSessions(p => p.filter(s => s.id !== id)); if (activeSessionId === id) setActiveSessionId(''); });
-  const handleRenameSession = (id: string, t: string) => api.updateConversation(id, { title: t }).then(() => setSessions(p => p.map(s => s.id === id ? { ...s, title: t } : s)));
-  const handleToggleFavorite = (id: string) => { const s = sessions.find(s => s.id === id); if (s) api.updateConversation(id, { isFavorite: !s.isFavorite }).then(() => setSessions(p => p.map(x => x.id === id ? { ...x, isFavorite: !x.isFavorite } : x))); };
-  const handleModelChange = (m: AIModel | 'auto') => { if (activeSessionId) api.updateConversation(activeSessionId, { preferredModel: m }).then(() => setSessions(p => p.map(s => s.id === activeSessionId ? { ...s, preferredModel: m } : s))); };
-  const handleLogout = () => logout().then(() => { setUser(null); setSessions([]); setView('chat'); setIsSettingsOpen(false); });
+  const handleNewChat = useCallback(async () => { if (!user) return; const s = await api.createConversation("New Chat"); setSessions(p => [s, ...p]); setActiveSessionId(s.id); setView('chat'); if (window.innerWidth < 1024) setIsSidebarOpen(false); }, [user]);
+  const handleSelectSession = useCallback((id: string) => { setActiveSessionId(id); api.getMessages(id, 100).then(m => startTransition(() => setSessions(p => p.map(s => s.id === id ? { ...s, messages: m } : s)))); }, []);
+  const handleDeleteSession = useCallback((id: string) => api.deleteConversation(id).then(() => { setSessions(p => p.filter(s => s.id !== id)); if (activeSessionId === id) setActiveSessionId(''); }), [activeSessionId]);
+  const handleRenameSession = useCallback((id: string, t: string) => api.updateConversation(id, { title: t }).then(() => setSessions(p => p.map(s => s.id === id ? { ...s, title: t } : s))), []);
+  const handleToggleFavorite = useCallback((id: string) => { const sess = sessions.find(s => s.id === id); if (sess) api.updateConversation(id, { isFavorite: !sess.isFavorite }).then(() => setSessions(p => p.map(x => x.id === id ? { ...x, isFavorite: !x.isFavorite } : x))); }, [sessions]);
+  const handleModelChange = useCallback((m: AIModel | 'auto') => { if (activeSessionId) api.updateConversation(activeSessionId, { preferredModel: m }).then(() => setSessions(p => p.map(s => s.id === activeSessionId ? { ...s, preferredModel: m } : s))); }, [activeSessionId]);
+  const handleLogout = useCallback(() => { api.clearUserCache(); logout().then(() => { setUser(null); setSessions([]); setView('chat'); setIsSettingsOpen(false); }); }, []);
 
   const completeOnboarding = () => { setShowOnboarding(false); localStorage.setItem('nexus_onboarding_done', 'true'); };
 
@@ -349,11 +373,11 @@ const App: React.FC = () => {
   
   if (showResetPassword) {
     return (
+      <Suspense fallback={<LazyFallback />}>
       <ResetPasswordPage 
         onResetSuccess={() => {
           setShowResetPassword(false);
           setShowAuth(true);
-          // Clean up URL hash/params
           window.history.replaceState(null, '', window.location.pathname);
         }}
         onBackToAuth={() => {
@@ -362,17 +386,18 @@ const App: React.FC = () => {
           window.history.replaceState(null, '', window.location.pathname);
         }}
       />
+      </Suspense>
     );
   }
 
   if (!user) {
-    return showAuth ? <AuthPage onAuthSuccess={(u) => { setUser(u); setShowAuth(false); if (!localStorage.getItem('nexus_survey_done')) setShowSurvey(true); }} /> : <LandingPage onOpenAuth={() => setShowAuth(true)} />;
+    return <Suspense fallback={<LazyFallback />}>{showAuth ? <AuthPage onAuthSuccess={(u) => { setUser(u); setShowAuth(false); if (!localStorage.getItem('nexus_survey_done')) setShowSurvey(true); }} /> : <LandingPage onOpenAuth={() => setShowAuth(true)} />}</Suspense>;
   }
 
   return (
     <ErrorBoundary>
       <div className="flex h-screen h-[100dvh] bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden font-sans relative">
-      {showSurvey && <OnboardingSurvey onComplete={handleSurveyComplete} userName={user.personification || user.email} />}
+      {showSurvey && <Suspense fallback={<LazyFallback />}><OnboardingSurvey onComplete={handleSurveyComplete} userName={user.personification || user.email} /></Suspense>}
       <Sidebar sessions={sessions} activeSessionId={activeSessionId} onNewChat={handleNewChat} onSelectSession={handleSelectSession} view={view} onSetView={setView} stats={userStats} onDeleteSession={handleDeleteSession} onRenameSession={handleRenameSession} onToggleFavorite={handleToggleFavorite} onOpenSettings={() => setIsSettingsOpen(true)} searchInputRef={null as any} isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} user={user} />
       <main className="flex-1 flex flex-col min-w-0 relative">
         {view === 'chat' && activeSession ? (
@@ -381,13 +406,13 @@ const App: React.FC = () => {
             <MessageInput onSendMessage={handleSendMessage} onStop={() => abortControllerRef.current?.abort()} isDisabled={isLoading} preferredModel={activeSession.preferredModel} onModelChange={handleModelChange} activeSessionId={activeSessionId} />
           </>
         ) : view === 'dashboard' ? (
-          <Dashboard stats={userStats!} onUpgrade={() => setView('pricing')} />
+          <Suspense fallback={<LazyFallback />}><Dashboard stats={userStats!} onUpgrade={() => setView('pricing')} /></Suspense>
         ) : view === 'pricing' ? (
-          <Pricing onUpgrade={() => setView('billing')} onClose={() => setView('chat')} />
+          <Suspense fallback={<LazyFallback />}><Pricing onUpgrade={() => setView('billing')} onClose={() => setView('chat')} /></Suspense>
         ) : view === 'billing' ? (
-          <Billing stats={userStats!} onCancel={() => {}} onUpgrade={() => setView('pricing')} onClose={() => setView('chat')} />
+          <Suspense fallback={<LazyFallback />}><Billing stats={userStats!} onCancel={() => {}} onUpgrade={() => setView('pricing')} onClose={() => setView('chat')} /></Suspense>
         ) : view === 'admin' ? (
-          <AdminDashboard stats={getAdminStats()} />
+          <Suspense fallback={<LazyFallback />}><AdminDashboard stats={getAdminStats()} /></Suspense>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
             <div className="w-20 h-20 bg-emerald-500/5 rounded-3xl flex items-center justify-center mb-8 border border-white/5 shadow-2xl">
@@ -398,8 +423,8 @@ const App: React.FC = () => {
         )}
       </main>
       
-      {showOnboarding && <MobileOnboarding onComplete={completeOnboarding} />}
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userSettings={userSettings} onSave={(s) => { setUserSettings(s); localStorage.setItem('nexus_user_settings', JSON.stringify(s)); }} onPurgeHistory={() => api.purgeAllConversations().then(() => { setSessions([]); setActiveSessionId(''); })} onUpgrade={() => { setIsSettingsOpen(false); setView('pricing'); }} onLogout={handleLogout} user={user} stats={userStats} onThemeToggle={handleThemeToggle} theme={theme} />
+      {showOnboarding && <Suspense fallback={<LazyFallback />}><MobileOnboarding onComplete={completeOnboarding} /></Suspense>}
+      <Suspense fallback={null}><SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userSettings={userSettings} onSave={(s) => { setUserSettings(s); localStorage.setItem('nexus_user_settings', JSON.stringify(s)); }} onPurgeHistory={() => api.purgeAllConversations().then(() => { setSessions([]); setActiveSessionId(''); })} onUpgrade={() => { setIsSettingsOpen(false); setView('pricing'); }} onLogout={handleLogout} user={user} stats={userStats} onThemeToggle={handleThemeToggle} theme={theme} /></Suspense>
       <Toast toasts={toasts} onRemove={removeToast} />
       </div>
     </ErrorBoundary>

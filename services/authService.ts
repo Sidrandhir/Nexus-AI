@@ -38,30 +38,35 @@ export const getCurrentUser = async (): Promise<User | null> => {
     let isAdmin = false;
     let fullName = authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Explorer';
 
-    // Attempt to fetch profile record
-    const { data: profile, error: fetchError } = await supabase
-      .from('profiles')
-      .select('tier, is_admin, full_name')
-      .eq('id', authUser.id)
-      .maybeSingle();
+    // Attempt to fetch profile record with a timeout to prevent hanging
+    try {
+      const profilePromise = supabase
+        .from('profiles')
+        .select('tier, is_admin, full_name')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      
+      // Race against a 5s timeout to prevent login freeze on slow DB
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+      const result = await Promise.race([profilePromise, timeoutPromise]);
+      
+      const profile = result && 'data' in result ? result.data : null;
 
-    if (profile) {
-      userTier = (profile.tier as UserTier) || 'free';
-      isAdmin = profile.is_admin || false;
-      fullName = profile.full_name || fullName;
-    } else {
-      // SELF-HEALING: If the profile is missing from the DB, try to create it now.
-      // This fixes the "Database error" issue for users running locally without triggers.
-      try {
-        await supabase.from('profiles').upsert({
+      if (profile) {
+        userTier = (profile.tier as UserTier) || 'free';
+        isAdmin = profile.is_admin || false;
+        fullName = profile.full_name || fullName;
+      } else {
+        // SELF-HEALING: If the profile is missing from the DB, try to create it now.
+        supabase.from('profiles').upsert({
           id: authUser.id,
           full_name: fullName,
           tier: 'free',
           updated_at: new Date().toISOString()
-        }, { onConflict: 'id' });
-      } catch (e) {
-        console.warn("Background profile initialization pending...");
+        }, { onConflict: 'id' }).catch(() => {});
       }
+    } catch (e) {
+      console.warn("Profile fetch failed, using defaults");
     }
 
     // Fixed: Using personification instead of persona
