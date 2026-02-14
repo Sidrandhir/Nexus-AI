@@ -314,9 +314,19 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
       bash: 'sh', shell: 'sh', powershell: 'ps1', csv: 'csv',
       toml: 'toml', ini: 'ini', dockerfile: 'Dockerfile',
     };
+    const mimeMap: Record<string, string> = {
+      csv: 'text/csv', json: 'application/json', html: 'text/html',
+      xml: 'application/xml', sql: 'application/sql', markdown: 'text/markdown',
+    };
+    const nameMap: Record<string, string> = {
+      csv: 'data', json: 'data', html: 'document', sql: 'query',
+      markdown: 'document', xml: 'data',
+    };
     const ext = extMap[language] || language || 'txt';
-    const blob = new Blob([codeString], { type: 'text/plain' });
-    downloadFile(blob, `code.${ext}`);
+    const mime = mimeMap[language] || 'text/plain';
+    const baseName = nameMap[language] || 'code';
+    const blob = new Blob([codeString], { type: mime });
+    downloadFile(blob, `${baseName}.${ext}`);
   };
 
   // Memoize syntax highlighting — only recompute when code content changes
