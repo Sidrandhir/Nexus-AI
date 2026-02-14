@@ -722,7 +722,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-primary)] relative overflow-hidden">
-      <div className="fixed top-6 right-8 z-40 flex gap-2 bg-[var(--bg-primary)]/90 rounded-2xl shadow-xl border border-[var(--border)] px-3 py-2 backdrop-blur-md items-center">
+      <div className="fixed top-6 right-8 z-40 flex gap-2 bg-[var(--bg-primary)]/90 rounded-2xl shadow-xl border border-[var(--border)] px-3 py-2 backdrop-blur-md items-center hide-on-mobile">
         <button onClick={onThemeToggle} aria-label="Toggle theme" data-nexus-tooltip={theme === 'dark' ? 'Light mode' : 'Dark mode'} className="p-2.5 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-colors">{theme === 'dark' ? <Icons.Sun className="w-4 h-4" /> : <Icons.Moon className="w-4 h-4" />}</button>
         <button onClick={onExport} aria-label="Export conversation" data-nexus-tooltip="Export chat" className="p-2.5 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-colors"><Icons.Download className="w-4 h-4" /></button>
       </div>
