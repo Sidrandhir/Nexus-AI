@@ -18,7 +18,6 @@ interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   user: User;
-  onExtractSession?: (id: string) => void; // Optional extract handler
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -120,10 +119,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const [mobileMenuId, setMobileMenuId] = useState<string | null>(null);
-
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
-
   const renderSessionItem = (session: ChatSession) => {
     const isActive = activeSessionId === session.id && view === 'chat';
     const isConfirming = confirmingDeleteId === session.id;
@@ -155,37 +150,22 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span className={`flex-1 truncate pr-[120px] font-medium ${isConfirming ? 'text-red-500 font-bold' : ''}`}>
               {isConfirming ? 'Delete chat?' : (session.title || 'New Chat')}
             </span>
-            {/* Mobile: show 3-dot menu with star, edit, delete, extract */}
-            {isMobile ? (
-              <div className="relative">
-                <button aria-label="Open menu" onClick={e => { e.stopPropagation(); setMobileMenuId(mobileMenuId === session.id ? null : session.id); }} className="p-2"><Icons.MoreVertical className="w-5 h-5" /></button>
-                {mobileMenuId === session.id && (
-                  <div className="absolute right-0 top-10 min-w-[140px] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-xl z-50 flex flex-col">
-                    <button onClick={e => { e.stopPropagation(); onToggleFavorite(session.id); setMobileMenuId(null); }} className="flex items-center gap-2 px-4 py-2 hover:bg-[var(--bg-tertiary)]/40 text-left"><Icons.Star className="w-4 h-4" />{session.isFavorite ? 'Unstar' : 'Star'}</button>
-                    <button onClick={e => { e.stopPropagation(); startEditing(e, session); setMobileMenuId(null); }} className="flex items-center gap-2 px-4 py-2 hover:bg-[var(--bg-tertiary)]/40 text-left"><Icons.Edit className="w-4 h-4" />Edit</button>
-                    <button onClick={e => { e.stopPropagation(); handleDeleteClick(e, session.id); setMobileMenuId(null); }} className="flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 text-left text-red-500"><Icons.Trash className="w-4 h-4" />Delete</button>
-                    <button onClick={e => { e.stopPropagation(); onExtractSession && onExtractSession(session.id); setMobileMenuId(null); }} className="flex items-center gap-2 px-4 py-2 hover:bg-[var(--bg-tertiary)]/40 text-left"><Icons.Download className="w-4 h-4" />Extract</button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className={`absolute right-2 flex items-center gap-1 transition-opacity ${isActive || isConfirming ? 'opacity-100' : 'opacity-0 sm:group-hover:opacity-100'}`}>
-                {isConfirming ? (
-                  <>
-                    <button aria-label="Confirm session deletion" onClick={(e) => handleDeleteClick(e, session.id)} data-nexus-tooltip="Yes, delete" className="p-2 text-red-500 rounded-lg"><Icons.Check className="w-4 h-4" /></button>
-                    <button aria-label="Cancel session deletion" onClick={cancelDelete} data-nexus-tooltip="Cancel" className="p-2 text-[var(--text-secondary)] rounded-lg"><Icons.X className="w-4 h-4" /></button>
-                  </>
-                ) : (
-                  <>
-                    <button aria-label={session.isFavorite ? "Unpin session" : "Pin session"} onClick={(e) => { e.stopPropagation(); onToggleFavorite(session.id); }} data-nexus-tooltip={session.isFavorite ? "Unpin" : "Pin"} className={`p-2 transition-colors ${session.isFavorite ? 'text-[var(--accent)]' : 'hover:text-[var(--accent)]'}`}>
-                      <Icons.Star fill={session.isFavorite ? 'currentColor' : 'none'} className="w-4 h-4" />
-                    </button>
-                    <button aria-label="Rename session" onClick={(e) => startEditing(e, session)} data-nexus-tooltip="Rename" className="p-2 hover:text-[var(--accent)] transition-colors"><Icons.Edit className="w-4 h-4" /></button>
-                    <button aria-label="Delete session" onClick={(e) => handleDeleteClick(e, session.id)} data-nexus-tooltip="Delete" className="p-2 hover:text-red-500 transition-colors"><Icons.Trash className="w-4 h-4" /></button>
-                  </>
-                )}
-              </div>
-            )}
+            <div className={`absolute right-2 flex items-center gap-1 transition-opacity ${isActive || isConfirming ? 'opacity-100' : 'opacity-0 sm:group-hover:opacity-100'}`}>
+              {isConfirming ? (
+                <>
+                  <button aria-label="Confirm session deletion" onClick={(e) => handleDeleteClick(e, session.id)} data-nexus-tooltip="Yes, delete" className="p-2 text-red-500 rounded-lg"><Icons.Check className="w-4 h-4" /></button>
+                  <button aria-label="Cancel session deletion" onClick={cancelDelete} data-nexus-tooltip="Cancel" className="p-2 text-[var(--text-secondary)] rounded-lg"><Icons.X className="w-4 h-4" /></button>
+                </>
+              ) : (
+                <>
+                  <button aria-label={session.isFavorite ? "Unpin session" : "Pin session"} onClick={(e) => { e.stopPropagation(); onToggleFavorite(session.id); }} data-nexus-tooltip={session.isFavorite ? "Unpin" : "Pin"} className={`p-2 transition-colors ${session.isFavorite ? 'text-[var(--accent)]' : 'hover:text-[var(--accent)]'}`}>
+                    <Icons.Star fill={session.isFavorite ? 'currentColor' : 'none'} className="w-4 h-4" />
+                  </button>
+                  <button aria-label="Rename session" onClick={(e) => startEditing(e, session)} data-nexus-tooltip="Rename" className="p-2 hover:text-[var(--accent)] transition-colors"><Icons.Edit className="w-4 h-4" /></button>
+                  <button aria-label="Delete session" onClick={(e) => handleDeleteClick(e, session.id)} data-nexus-tooltip="Delete" className="p-2 hover:text-red-500 transition-colors"><Icons.Trash className="w-4 h-4" /></button>
+                </>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -194,17 +174,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Mobile floating open button */}
-      {!isOpen && isMobile && (
-        <button
-          className="fixed bottom-6 left-6 z-[70] bg-[var(--bg-secondary)] border border-[var(--border)] shadow-xl rounded-full p-4 flex items-center justify-center sm:hidden"
-          onClick={onToggle}
-          aria-label="Open sidebar"
-        >
-          <Icons.PanelLeftOpen className="w-6 h-6" />
-        </button>
-      )}
-
       <div 
         className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] sm:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onToggle}
