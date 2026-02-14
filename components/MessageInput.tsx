@@ -537,7 +537,77 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
 
   return (
     <div className="p-3 sm:p-4 bg-[var(--bg-primary)] relative pb-safe flex-shrink-0 z-[35] transition-all">
-      {/* Removed the auto/model selector button from the chatbar top row */}
+      <div className="max-w-3xl mx-auto mb-2 flex items-center justify-between">
+        <div>
+          <button 
+            ref={buttonRef}
+            disabled={isDisabled}
+            onClick={handleToggleDropdown}
+            className={`flex items-center gap-2 px-3 py-1.5 text-[12px] sm:text-[13px] font-semibold rounded-full border shadow-sm transition-all ${modelColors[preferredModel]} ${isDisabled ? 'opacity-50' : 'hover:brightness-110 active:scale-95'}`}
+          >
+            <Icons.Robot className="w-3.5 h-3.5" />
+            {modelExpertise[preferredModel].label}
+            <Icons.PanelLeftOpen className={`w-2.5 h-2.5 transition-transform ${showModelDropdown ? 'rotate-90' : ''}`} />
+          </button>
+        </div>
+
+        {showModelDropdown && dropdownPos && createPortal(
+          <div 
+            ref={dropdownRef}
+            style={{
+              position: 'fixed',
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              transform: 'translateY(-100%)',
+              zIndex: 9999,
+            }}
+            className="w-[min(20rem,calc(100vw-2rem))] sm:w-[26rem] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl shadow-2xl py-2 flex"
+          >
+            <div className="w-48 sm:w-56 border-r border-[var(--border)] flex flex-col">
+              <button 
+                onMouseEnter={() => setHoveredModel('auto')}
+                onClick={() => { onModelChange?.('auto'); setShowModelDropdown(false); }} 
+                className={`w-full text-left px-4 py-3 text-[13px] transition-colors ${preferredModel === 'auto' ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'}`}
+              >
+                <div className="font-semibold tracking-tight flex items-center gap-2"><span className="text-sm">✨</span>Auto</div>
+              </button>
+              {[
+                { m: AIModel.GPT4, l: "Reasoning & Planning", icon: "🧠" },
+                { m: AIModel.CLAUDE, l: "Coding & Writing", icon: "⚡" },
+                { m: AIModel.GEMINI, l: "Search & Speed", icon: "🔍" }
+              ].map(({ m, l, icon }) => (
+                <button 
+                  key={m} 
+                  onMouseEnter={() => setHoveredModel(m)}
+                  onClick={() => { onModelChange?.(m); setShowModelDropdown(false); }} 
+                  className={`w-full text-left px-4 py-3 text-[13px] transition-colors ${preferredModel === m ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'}`}
+                >
+                  <div className="font-semibold tracking-tight flex items-center gap-2"><span className="text-sm">{icon}</span>{l}</div>
+                </button>
+              ))}
+            </div>
+            <div className="flex-1 p-4 bg-[var(--bg-tertiary)]/30 min-h-[160px] flex flex-col justify-center">
+              {hoveredModel ? (
+                <div>
+                  <p className="text-[12px] sm:text-[13px] font-bold text-[var(--accent)] mb-1.5 tracking-tight leading-tight">{modelExpertise[hoveredModel].expertise}</p>
+                  <p className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] leading-relaxed opacity-80 mb-3">{modelExpertise[hoveredModel].detail}</p>
+                  <p className="text-[11px] sm:text-[12px] text-[var(--text-secondary)]/60 leading-relaxed italic">{modelExpertise[hoveredModel].examples}</p>
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-20">
+                  <Icons.Shield className="w-8 h-8" />
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
+        {isProcessing && (
+          <div className="flex items-center gap-2 text-emerald-500 animate-pulse">
+            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+          </div>
+        )}
+      </div>
 
       {/* Hidden file inputs */}
       <input 
@@ -751,73 +821,6 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
                 {isListening ? <Icons.MicOff className="w-5 h-5" /> : <Icons.Mic className="w-5 h-5" />}
               </button>
             )}
-
-            {/* Model selector button (Auto) — moved next to mic */}
-            <button 
-              ref={buttonRef}
-              disabled={isDisabled}
-              onClick={handleToggleDropdown}
-              className={`flex items-center gap-1 px-2 py-1 text-[12px] font-semibold rounded-full border shadow-sm transition-all ${modelColors[preferredModel]} ${isDisabled ? 'opacity-50' : 'hover:brightness-110 active:scale-95'}`}
-              style={{ marginLeft: 4, marginRight: 4 }}
-            >
-              <Icons.Robot className="w-4 h-4" />
-              {modelExpertise[preferredModel].label}
-              <Icons.PanelLeftOpen className={`w-2.5 h-2.5 transition-transform ${showModelDropdown ? 'rotate-90' : ''}`} />
-            </button>
-
-            {/* Model dropdown (portal) */}
-            {showModelDropdown && dropdownPos && createPortal(
-              <div 
-                ref={dropdownRef}
-                style={{
-                  position: 'fixed',
-                  top: dropdownPos.top,
-                  left: dropdownPos.left,
-                  transform: 'translateY(-100%)',
-                  zIndex: 9999,
-                }}
-                className="w-[min(20rem,calc(100vw-2rem))] sm:w-[26rem] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl shadow-2xl py-2 flex"
-              >
-                <div className="w-48 sm:w-56 border-r border-[var(--border)] flex flex-col">
-                  <button 
-                    onMouseEnter={() => setHoveredModel('auto')}
-                    onClick={() => { onModelChange?.('auto'); setShowModelDropdown(false); }} 
-                    className={`w-full text-left px-4 py-3 text-[13px] transition-colors ${preferredModel === 'auto' ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'}`}
-                  >
-                    <div className="font-semibold tracking-tight flex items-center gap-2"><span className="text-sm">✨</span>Auto</div>
-                  </button>
-                  {[
-                    { m: AIModel.GPT4, l: "Reasoning & Planning", icon: "🧠" },
-                    { m: AIModel.CLAUDE, l: "Coding & Writing", icon: "⚡" },
-                    { m: AIModel.GEMINI, l: "Search & Speed", icon: "🔍" }
-                  ].map(({ m, l, icon }) => (
-                    <button 
-                      key={m} 
-                      onMouseEnter={() => setHoveredModel(m)}
-                      onClick={() => { onModelChange?.(m); setShowModelDropdown(false); }} 
-                      className={`w-full text-left px-4 py-3 text-[13px] transition-colors ${preferredModel === m ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'}`}
-                    >
-                      <div className="font-semibold tracking-tight flex items-center gap-2"><span className="text-sm">{icon}</span>{l}</div>
-                    </button>
-                  ))}
-                </div>
-                <div className="flex-1 p-4 bg-[var(--bg-tertiary)]/30 min-h-[160px] flex flex-col justify-center">
-                  {hoveredModel ? (
-                    <div>
-                      <p className="text-[12px] sm:text-[13px] font-bold text-[var(--accent)] mb-1.5 tracking-tight leading-tight">{modelExpertise[hoveredModel].expertise}</p>
-                      <p className="text-[12px] sm:text-[13px] text-[var(--text-secondary)] leading-relaxed opacity-80 mb-3">{modelExpertise[hoveredModel].detail}</p>
-                      <p className="text-[11px] sm:text-[12px] text-[var(--text-secondary)]/60 leading-relaxed italic">{modelExpertise[hoveredModel].examples}</p>
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-center opacity-20">
-                      <Icons.Shield className="w-8 h-8" />
-                    </div>
-                  )}
-                </div>
-              </div>,
-              document.body
-            )}
-
             {/* Send / Stop button */}
             <button 
               onClick={isDisabled ? onStop : () => handleSubmit()} 
