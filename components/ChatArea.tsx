@@ -3,6 +3,7 @@ import { Message, AIModel, RouterResult, ChatSession, GroundingChunk } from '../
 import { Icons } from '../constants';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import './ChatArea.css';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import { 
@@ -460,11 +461,6 @@ const MessageItem = memo(({ msg, isLast, isLoading, copiedId, editingId, editCon
             </div>
           )}
         </div>
-        {isLast && msg.role === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && !isLoading && (
-          <div className="mt-8 flex flex-col gap-3 items-start animate-in fade-in slide-in-from-bottom-2 duration-700">
-            <div className="flex flex-wrap gap-2">{msg.suggestions.map((suggestion, i) => (<button key={i} onClick={() => onSuggestionClick?.(suggestion)} className="px-4 py-2.5 rounded-xl bg-[var(--bg-tertiary)]/20 border border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all text-[13px] sm:text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] text-left active:scale-[0.97] shadow-sm">{suggestion}</button>))}</div>
-          </div>
-        )}
         <div className={`mt-2 flex items-center gap-1 ${msg.role === 'assistant' ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity ${msg.role === 'user' ? 'justify-end pr-2' : 'pl-2'}`}>
           <button onClick={() => onCopyText(msg.content, msg.id)} aria-label="Copy message" data-nexus-tooltip={copiedId === msg.id ? 'Copied' : 'Copy'} className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all">{copiedId === msg.id ? <Icons.Check className="w-3.5 h-3.5 text-[var(--accent)]" /> : <Icons.Copy className="w-3.5 h-3.5" />}</button>
           {msg.role === 'user' && <button onClick={() => onStartEdit(msg.id, msg.content)} aria-label="Edit message" data-nexus-tooltip="Edit" className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all"><Icons.Edit className="w-3.5 h-3.5" /></button>}
@@ -511,6 +507,11 @@ const MessageItem = memo(({ msg, isLast, isLoading, copiedId, editingId, editCon
             </>
           )}
         </div>
+        {isLast && msg.role === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && !isLoading && (
+          <div className="mt-8 flex flex-col gap-3 items-start animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <div className="flex flex-wrap gap-2">{msg.suggestions.map((suggestion, i) => (<button key={i} onClick={() => onSuggestionClick?.(suggestion)} className="px-4 py-2.5 rounded-xl bg-[var(--bg-tertiary)]/20 border border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all text-[13px] sm:text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] text-left active:scale-[0.97] shadow-sm">{suggestion}</button>))}</div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -703,7 +704,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     table: EnhancedTable,
     p: ({ children }: any) => <div className="mb-4 leading-relaxed">{children}</div>,
     code: ({ node, inline, className, children, ...props }: any) => {
-      return !inline ? (<CodeBlock className={className} children={children} />) : (<code className={`${className || ''} text-[var(--accent)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-md text-[0.875em] font-semibold border border-[var(--border)]`} {...props}>{children}</code>);
+      // Always render fenced code blocks as block
+      if (!inline) return <CodeBlock className={className} children={children} />;
+
+      // Only render as inline if it's a single identifier (no spaces, no symbols, no newlines)
+      const text = String(children).trim();
+      const identifierPattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+      if (identifierPattern.test(text)) {
+        return <code className={`${className || ''} inline-code text-[var(--accent)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-md text-[0.875em] font-semibold border border-[var(--border)]`} {...props}>{children}</code>;
+      }
+      // Otherwise, treat as block code
+      return <CodeBlock className={className} children={children} />;
     }
   }), []);
 
@@ -711,27 +722,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-primary)] relative overflow-hidden">
-      <header className="h-14 sm:h-16 border-b border-[var(--border)] glass flex items-center justify-between px-4 sm:px-8 flex-shrink-0 pt-safe z-[30] transition-colors relative">
-        <div className="flex items-center gap-4">
-          {!isSidebarOpen && (
-            <button onClick={onToggleSidebar} aria-label="Toggle sidebar" className="p-2 -ml-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 sm:hidden transition-colors">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-[var(--text-primary)]" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
-            </button>
-          )}
-          <div className="flex flex-col">
-            <h2 className="text-[13px] sm:text-sm font-bold tracking-tight text-[var(--text-primary)] truncate max-w-[140px] sm:max-w-none">{session?.title || "New Chat"}</h2>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <button onClick={onThemeToggle} aria-label="Toggle theme" data-nexus-tooltip={theme === 'dark' ? 'Light mode' : 'Dark mode'} className="p-2.5 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-colors">{theme === 'dark' ? <Icons.Sun className="w-4 h-4" /> : <Icons.Moon className="w-4 h-4" />}</button>
-          <button onClick={onExport} aria-label="Export conversation" data-nexus-tooltip="Export chat" className="p-2.5 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-colors"><Icons.Download className="w-4 h-4" /></button>
-        </div>
-      </header>
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 sm:px-8 py-8 sm:py-12 touch-action-pan-y overscroll-behavior-contain">
-        <div className="max-w-3xl mx-auto flex flex-col gap-12 pb-24">
+      <div className="fixed top-6 right-8 z-40 flex gap-2 bg-[var(--bg-primary)]/90 rounded-2xl shadow-xl border border-[var(--border)] px-3 py-2 backdrop-blur-md items-center">
+        <button onClick={onThemeToggle} aria-label="Toggle theme" data-nexus-tooltip={theme === 'dark' ? 'Light mode' : 'Dark mode'} className="p-2.5 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-colors">{theme === 'dark' ? <Icons.Sun className="w-4 h-4" /> : <Icons.Moon className="w-4 h-4" />}</button>
+        <button onClick={onExport} aria-label="Export conversation" data-nexus-tooltip="Export chat" className="p-2.5 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-colors"><Icons.Download className="w-4 h-4" /></button>
+      </div>
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-2 sm:px-0 py-8 sm:py-14 touch-action-pan-y overscroll-behavior-contain">
+        <div className="max-w-[900px] w-full mx-auto flex flex-col gap-12 pb-32">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center pt-32 text-center animate-in fade-in duration-1000">
                <div className="w-16 h-16 bg-[var(--accent)]/5 rounded-2xl flex items-center justify-center border border-[var(--accent)]/10"><Icons.Robot className="w-8 h-8 text-[var(--accent)] opacity-30" /></div>
