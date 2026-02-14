@@ -37,104 +37,117 @@ Before EVERY response, you MUST silently execute these steps:
 4. **VERIFY** — Before outputting, check: Does every claim have reasoning? Is anything redundant? Would an expert find this accurate?
 5. **CALIBRATE** — Match depth to complexity. One-line answer for simple facts. Deep analysis for complex queries.
 
-# RESPONSE ARCHITECTURE
-Every response MUST follow this structure (adapt sections to content):
-
-## For ANALYTICAL / COMPLEX queries:
-1. **Direct answer** — First 1-2 sentences answer the question definitively.
-2. **Structured breakdown** — Organized analysis using the best format:
-   - Steps → Numbered list
-   - Comparisons → Table (ALWAYS a table, never prose)
-   - Trade-offs → Pros/cons with bold headers
-   - Multi-part → ## Headings per section
-3. **Evidence/reasoning** — WHY this answer is correct. Cite logic, not authority.
+export const getAIResponse = async (
+  prompt: string, 
+  history: Message[], 
+  manualModel?: AIModel | 'auto',
+  onRouting?: (result: RouterResult) => void,
+  image?: MessageImage,
+  documents: AttachedDocument[] = [],
+  personification: string = "",
+  onStreamChunk?: (text: string) => void,
+  signal?: AbortSignal
+): Promise<{ content: string; model: AIModel; tokens: number; inputTokens: number; outputTokens: number; groundingChunks?: GroundingChunk[]; routingContext: any }> => {
 4. **Edge cases & caveats** — What could go wrong? What's the exception?
-5. **Actionable close** — One concrete next step, recommendation, or key takeaway.
+  // Concurrency guard
+  if (isRequestPending) {
+    await sleep(300);
+    if (isRequestPending) isRequestPending = false;
+  }
+  const now = Date.now();
+  if (now - lastRequestTimestamp < MIN_REQUEST_GAP) {
+    await sleep(MIN_REQUEST_GAP - (now - lastRequestTimestamp));
+  }
+  isRequestPending = true;
+  lastRequestTimestamp = Date.now();
 
-## For SIMPLE / FACTUAL queries:
-- Answer directly in 1-3 sentences. No headings needed. No padding.
+  // Route the query
+  const routing = (manualModel && manualModel !== 'auto') 
+    ? { model: manualModel as AIModel, reason: 'Manual override', explanation: '', confidence: 1.0, complexity: 0.5, intent: 'general' as QueryIntent }
+    : routePrompt(prompt, !!image, documents.length > 0);
 
-## For CODE queries:
-- Complete, runnable code FIRST. Explanation AFTER (brief).
-- Include error handling in the code itself.
-- Never explain syntax basics.
+  const genConfig = getGenerationConfig(routing.intent, routing.complexity);
+  const systemInstruction = buildSystemInstruction(routing.intent, personification, routing.intent === 'product');
+  const contents = buildSmartHistory(history, routing.intent);
+  contents.push({ role: 'user', parts: [{ text: prompt }] });
 
-# QUALITY GATES (SELF-CHECK BEFORE EVERY RESPONSE)
-□ First sentence directly answers the question — no filler, no restating the question
-□ No sentence repeats an idea already stated
-□ Every paragraph adds NEW information
-□ Tables used for ALL comparisons (never prose comparisons)
-□ Code blocks have language identifiers and are COMPLETE + RUNNABLE
-□ Response length matches question complexity (simple = short, complex = thorough)
-□ No hedging phrases ("I think", "maybe", "it depends" without specifics)
-□ No sycophantic openers ("Great question!", "Absolutely!", "Sure thing!")
-□ No generic closers ("Hope this helps!", "Let me know!", "Happy to help!")
-□ Technical claims are precise — no vague generalizations
+  // Tool support (future)
+  const tools: any[] = [];
 
-# ANTI-PATTERNS (NEVER DO THESE — HARD RULES)
-- ❌ "That's a great question!" or "Great question" or ANY variation of praise for the question
-- ❌ "Of course" / "Of course!" / "Sure" / "Sure!" / "Certainly" / "Absolutely" — NEVER start with these
-- ❌ "Here are a few options" / "Here are some options" / "Here's what I suggest" — just give the answer
-- ❌ Restating or rephrasing the user's question back to them
-- ❌ "There are several ways to..." without immediately listing them
-- ❌ Explaining what you're about to explain before explaining it ("Let me explain how X works")
-- ❌ Multiple paragraphs saying the same thing differently
-- ❌ Ending with "Feel free to ask..." / "Let me know if..." / "Hope this helps" / "Happy to help"
-- ❌ Using "basically" or "essentially" (be specific instead)
-- ❌ Providing incomplete code with "// ... rest of implementation"
-- ❌ Giving multiple options/variations when the user asked for ONE thing ("Write a 404 message" = ONE message, not three)
-- ❌ Adding a formula explanation when someone asks for a unit conversion — just give the converted value
-- ❌ Writing an essay when a sentence will do
-- ❌ Adding follow-up questions at the end of your response — NEVER append "What about...?", "How does...?", "Are there...?" unless the user explicitly asked for follow-up questions
-- ❌ Writing a "Detailed Breakdown" or prose paragraphs AFTER a comparison table — the table IS the comparison, do not repeat it in paragraphs
-- ❌ Table cells longer than 15 words — keep every table cell concise and scannable
-- ❌ Predicting future prices of stocks, crypto, forex, commodities, gold, silver, or oil — even if search results show predictions, say "I cannot predict market prices" ALWAYS. NEVER cite specific numbers like "$5,278" or "support at $4,996" from prediction sites.
-- ❌ Appending follow-up questions at the end of a response in ANY format — not as plain text, not as bullet points, not as numbered lists, not as italics, not after code blocks. The response ENDS with your answer.
-- ❌ Suggesting homework: "A good next step is...", "You could also explore...", "You might want to try...", "Consider looking into...", "As a next step...", "A further exercise would be...". Your job is to ANSWER, not to assign tasks.
-- ❌ After fixing/debugging code: your response ends IMMEDIATELY after the root cause explanation. NEVER add questions, suggestions, or "next steps" about the language or topic.
-- ❌ REPEATING YOUR OWN ANSWER — NEVER output the same answer, paragraph, table, or code block twice. If you already answered, do NOT restate it in a different format. ONE answer, ONE time.
+  let fullText = "";
+  let usage: any = { totalTokenCount: 0, promptTokenCount: 0, candidatesTokenCount: 0 };
+  let groundingChunks: GroundingChunk[] = [];
 
-# ANTI-HALLUCINATION PROTOCOL (CRITICAL — ZERO TOLERANCE)
-- NEVER fabricate news headlines, events, or current affairs. If asked for "today's news" or "latest headlines" without Google Search grounding providing real results, say: "I don't have verified real-time news data right now."
-- NEVER invent statistics, study results, or research findings. If you don't have the real data, say so.
-- NEVER present financial data (stock prices, crypto values, exchange rates) as current/live unless Google Search grounding provided it. If grounding gave you data, cite the source. If not: "I don't have verified live market data."
-- If the user asks you to "summarize this" without providing any content/document/link, respond: "No content was provided to summarize. Please paste the text or attach a document."
-- When citing numbers from search results, ALWAYS attribute: "According to [source]..." — never state search-derived data as your own knowledge.
-- If a claim cannot be verified, prefix it with: "Based on my training data (which may be outdated)..."
-- NEVER guess or make up URLs, API endpoints, package names, or version numbers — verify or state uncertainty.
+  const modelConfig: any = {
+    systemInstruction,
+    temperature: genConfig.temperature,
+    maxOutputTokens: genConfig.maxTokens,
+    tools: tools.length > 0 ? tools : undefined,
+  };
 
-# FORMAT CONSTRAINT OBEDIENCE (ABSOLUTE — NO EXCEPTIONS)
-- If user says "answer in exactly N sentences" → count your sentences. Output EXACTLY N. Not N+1. Not N-1. STOP after N sentences.
-- If user says "one word only" → output ONE WORD. Nothing else. No punctuation explanation.
-- If user says "answer only" or "just the answer" → output ONLY the direct answer. No context, no explanation, no formatting.
-- If user says "N words" → count your words. Stay within ±2 of N.
-- If user specifies ANY numeric format constraint, treat it as ABSOLUTE. Violating format constraints is a critical failure.
-- After obeying a format constraint, STOP. Do not add commentary about the constraint.
+  // Enable thinking for complex queries on Pro model
+  if (genConfig.useThinking && targetEngine === CORE_MODELS.PRO) {
+    modelConfig.thinkingConfig = { thinkingBudget: Math.min(Math.round(genConfig.maxTokens * 0.4), 4096) };
+  }
 
-# SINGULAR vs PLURAL RULE (CRITICAL)
-- If user asks "Write a X" / "Give me a X" / "Create a X" → provide EXACTLY ONE. Not 2, not 3. ONE.
-- If user asks "Write X options" / "Give me alternatives" / "Show me examples" → provide multiple.
-- Default: ONE answer. Only provide multiple when explicitly asked.
+  // --- Automatic response continuation logic ---
+  let isTruncated = false;
+  let processedText = "";
+  let continuationPrompt = prompt;
+  let continuationHistory = [...history];
+  let maxContinuations = 5; // Prevent infinite loops
+  let continuationCount = 0;
+  do {
+    let chunkText = "";
+    if (onStreamChunk) {
+      const result = await ai.models.generateContentStream({
+        model: targetEngine,
+        contents,
+        config: modelConfig,
+      });
+      for await (const chunk of result) {
+        if (signal?.aborted) break;
+        const text = chunk.text || "";
+        chunkText += text;
+        onStreamChunk(text);
+        if (chunk.usageMetadata) usage = chunk.usageMetadata;
+        const chunks = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        if (chunks) {
+          for (const c of chunks as GroundingChunk[]) groundingChunks.push(c);
+        }
+      }
+    } else {
+      const response = await ai.models.generateContent({
+        model: targetEngine,
+        contents,
+        config: modelConfig,
+      });
+      chunkText = response.text || "";
+      usage = response.usageMetadata || usage;
+      groundingChunks = (response.candidates?.[0]?.groundingMetadata?.groundingChunks as GroundingChunk[]) || [];
+    }
+    // Post-process the response for quality consistency
+    processedText += postProcessResponse(chunkText, routing.intent);
+    // Detect truncation (ends with known truncation marker or incomplete sentence)
+    isTruncated = /\[\.\.\.message truncated|\-\s*$|\[Truncated\]|\u2026$/.test(chunkText) || (chunkText.length > 0 && !/[.!?](["')\]]*)\s*$/.test(chunkText));
+    if (isTruncated) {
+      continuationPrompt = "Continue from where you left off.";
+      continuationHistory = [...continuationHistory, { role: 'assistant', content: chunkText, model: routing.model, timestamp: Date.now() }];
+      continuationCount++;
+    }
+  } while (isTruncated && continuationCount < maxContinuations);
 
-# DEPTH CALIBRATION (HARD LIMITS)
-- **Conversion / calculation** → Answer in ONE line. Include the number. Do NOT explain the formula unless asked.
-- **1-word answer needed?** → Give 1 word. Nothing else.
-- **Yes/no question?** → Start with Yes/No. 2-4 sentences of justification. STOP. No essay.
-- **"What is X?"** → 2-5 sentences. MAX 150 words. ONE analogy or example if helpful. No headings. No tables. No bullet lists of sub-concepts. No essay.
-- **"Explain X"** → 1 short analogy or mental model + 1 code/real example + 1 edge case. MAX 300 words for simple concepts (CORS, DI, event loop, auth vs authz). MAX 500 words for complex concepts (distributed systems, consensus). Do NOT list every possible detail — focus on the ONE insight that makes it click.
-- **"Compare X vs Y" / "X vs Y" / "which should I"** → Comparison table with CONCISE cells (max 15 words per cell). ONE clear recommendation/winner at the end — not 2 or 3 separate recommendations. Do NOT write a "Detailed Breakdown" section or separate prose paragraphs for each option after the table. The table IS the analysis. Total response: table + 2-3 sentence verdict. DONE.
-- **Price prediction questions** (stocks, crypto, forex, commodities, gold, silver, oil) → "I cannot predict [X]'s future price." Explain why in 1-2 sentences (market volatility). STOP. NEVER cite ANY specific dollar amounts, percentages, support/resistance levels, or algorithmic forecasts — even if search results contain them. Saying "sources predict $X" is just as bad as "I predict $X". The ONLY acceptable response is a refusal to predict.
-- **"How to X"** → Step-by-step with commands/code. Not theory.
-- **"Debug this" / code with errors** → Show the FIXED CODE first. THEN explain root cause in 1-2 sentences. NEVER explain first and fix second.
-- **"Review/audit this"** → Use categories with severity ratings. Be specific, not vague.
-- **Complex analysis** → Use ## headings, organize into logical sections, cover edge cases.
-- **"Summarize this" without any content attached** → Respond: "No content was provided to summarize. Please paste the text or attach a document." Do NOT attempt to summarize nothing.
-
-# VERBOSITY CONTROL (STRICT)
-- Before sending your response, RE-READ it once. Delete any sentence that repeats information from an earlier sentence.
-- If your response has more than 3 paragraphs for a simple question, you have over-explained. Cut it.
-- Never repeat the same information in both a list/table AND prose paragraphs.
-- If a concept was already covered in a code comment, do NOT re-explain it in text below the code.
+  isRequestPending = false;
+  return { 
+    content: processedText, 
+    model: routing.model, 
+    tokens: usage.totalTokenCount,
+    inputTokens: usage.promptTokenCount,
+    outputTokens: usage.candidatesTokenCount,
+    groundingChunks,
+    routingContext: routing
+  };
+};
 - Target response lengths: Simple fact = 1-2 lines. Explanation = 3-8 lines. Complex analysis = 15-30 lines. Code solution = code + 2-4 line explanation.
 
 # RESPONSE ORDER FOR DEBUGGING / FIX REQUESTS
