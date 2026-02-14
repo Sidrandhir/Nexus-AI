@@ -129,7 +129,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div 
         key={session.id}
         onClick={() => !isConfirming && handleSessionClick(session.id)}
-        className={`group relative flex items-center w-full p-3 sm:p-2.5 rounded-xl text-[14px] sm:text-[13px] transition-all cursor-pointer ${
+        className={`group relative flex items-center w-full p-3 sm:p-2.5 rounded-xl text-[13px] sm:text-[14px] md:text-[14px] lg:text-[15px] transition-all cursor-pointer ${
           isActive ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-md border border-[var(--border)]' : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/50'
         } ${isConfirming ? 'border-red-500/50 bg-red-500/5' : ''}`}
       >
@@ -163,6 +163,38 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                   <button aria-label="Rename session" onClick={(e) => startEditing(e, session)} data-nexus-tooltip="Rename" className="p-2 hover:text-[var(--accent)] transition-colors"><Icons.Edit className="w-4 h-4" /></button>
                   <button aria-label="Delete session" onClick={(e) => handleDeleteClick(e, session.id)} data-nexus-tooltip="Delete" className="p-2 hover:text-red-500 transition-colors"><Icons.Trash className="w-4 h-4" /></button>
+                  {/* Extract button only on mobile view */}
+                  <button
+                    aria-label="Extract chat"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (typeof window !== 'undefined' && window.innerWidth < 640) {
+                        // Download chat as markdown
+                        const s = sessions.find(x => x.id === session.id);
+                        if (!s || !s.messages || !s.messages.length) return;
+                        let md = `# ${s.title || 'Chat Export'}\n\n`;
+                        md += `*Exported on ${new Date().toLocaleString()}*\n\n---\n\n`;
+                        s.messages.forEach(msg => {
+                          const role = msg.role === 'user' ? '**You**' : '**Nexus AI**';
+                          md += `### ${role}\n\n${msg.content}\n\n---\n\n`;
+                        });
+                        const blob = new Blob([md], { type: 'text/markdown' });
+                        const filename = `${(s.title || 'chat').replace(/[^a-z0-9]/gi, '_')}_export.md`;
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                      }
+                    }}
+                    data-nexus-tooltip="Extract"
+                    className="p-2 hover:text-emerald-500 transition-colors block sm:hidden"
+                  >
+                    <Icons.Download className="w-4 h-4" />
+                  </button>
                 </>
               )}
             </div>
@@ -178,6 +210,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] sm:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onToggle}
       />
+      {/* Mobile sidebar open button (only visible when sidebar is closed) */}
+      {!isOpen && (
+        <button
+          className="fixed top-4 left-4 z-[60] sm:hidden bg-[var(--bg-secondary)] border border-[var(--border)] shadow-lg rounded-xl p-2 flex items-center justify-center"
+          onClick={onToggle}
+          aria-label="Open sidebar"
+        >
+          <Icons.PanelLeftOpen className="w-6 h-6" />
+        </button>
+      )}
 
       <aside 
         className={`fixed sm:relative flex flex-col h-full bg-[var(--bg-secondary)] text-[var(--text-primary)] border-r border-[var(--border)] z-[50] sidebar-transition ${

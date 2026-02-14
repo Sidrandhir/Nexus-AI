@@ -1,13 +1,9 @@
-/* Utility: Hide on mobile */
-.hide-on-mobile {
-  display: initial;
-}
+/* Lower font size for mobile */
 @media (max-width: 640px) {
-  .hide-on-mobile {
-    display: none !important;
+  .markdown-body p, .markdown-body li, .markdown-body td, .markdown-body th {
+    font-size: 0.85rem;
   }
 }
-
 /* --- STRICT STRUCTURED DOCUMENT LAYOUT FOR CODE BLOCKS & MARKDOWN --- */
 .markdown-body pre,
 .markdown-body code[class*="language-"],
@@ -89,7 +85,6 @@
 
 /* ChatArea custom styles for clean, centered, document-style chat */
 
-
 .markdown-body {
   overflow-x: auto;
   line-height: 1.58;
@@ -102,15 +97,6 @@
   margin: 0 auto;
   padding: 0 32px;
   font-size: 1.08rem;
-}
-
-@media (max-width: 640px) {
-  .markdown-body {
-    font-size: 0.97rem;
-  }
-  .markdown-body th, .markdown-body td {
-    font-size: 0.92rem;
-  }
 }
 
 /* Paragraph rhythm (fixes “too close” issue) */
