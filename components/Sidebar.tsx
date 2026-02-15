@@ -66,17 +66,23 @@ const Sidebar: React.FC<SidebarProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onToggle]);
 
+
+
+  // Restore filteredSessions definition
   const filteredSessions = useMemo(() => {
     let list = sessions;
     if (debouncedSearch.trim()) {
       const term = debouncedSearch.toLowerCase();
-      // Only search titles — message content search is too expensive and causes freeze
-      list = sessions.filter(s => 
+      list = sessions.filter(s =>
         s.title.toLowerCase().includes(term)
       );
     }
     return list.slice(0, 50);
   }, [sessions, debouncedSearch]);
+
+  // Style helpers for ChatGPT-like session titles and menu
+  const sessionTitleClass = "text-[1.08rem] font-semibold leading-tight truncate transition-colors group-hover:text-[var(--accent)]";
+  const menuHeadingClass = "text-[0.98rem] font-bold uppercase tracking-wide text-[var(--text-secondary)] mb-2 mt-4";
 
   const favorites = filteredSessions.filter(s => s.isFavorite);
   const regular = filteredSessions.filter(s => !s.isFavorite);

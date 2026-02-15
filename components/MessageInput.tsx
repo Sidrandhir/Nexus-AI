@@ -535,6 +535,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
 const hasAttachments = imagePreview || attachedDocs.length > 0;
 
+  // Style helpers for ChatGPT-like input and helper text
+  const inputPlaceholderClass = "text-[1.08rem] sm:text-[1.08rem] font-normal text-[var(--text-secondary)]";
+  const helperTextClass = "text-[12px] sm:text-[13px] text-[var(--text-secondary)]/60 mt-2 mb-1 leading-relaxed text-center";
+
   return (
     <div className="p-3 sm:p-4 bg-[var(--bg-primary)] relative pb-safe flex-shrink-0 z-[35] transition-all">
       <div className="max-w-3xl mx-auto mb-2 flex items-center justify-between">
@@ -798,6 +802,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type your message..."
+            className={inputPlaceholderClass + " w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-[var(--text-primary)] placeholder-[var(--text-secondary)] text-base sm:text-lg leading-relaxed"}
             disabled={isDisabled}
             rows={1}
             aria-label="Chat message input"
@@ -846,7 +851,8 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
           </div>
         </div>
       </div>
-      {/* Caution message removed as requested */}
+      {/* Helper text example (add as needed) */}
+      {/* <p className={helperTextClass}>Your message is private and secure.</p> */}
     </div>
   );
 };
