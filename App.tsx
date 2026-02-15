@@ -1,17 +1,3 @@
-// Utility: Check if element or parent is horizontally scrollable
-const isHorizontallyScrollable = (el: HTMLElement | null): boolean => {
-  while (el) {
-    const hasScroll =
-      el.scrollWidth > el.clientWidth &&
-      getComputedStyle(el).overflowX !== "hidden";
-    if (hasScroll) return true;
-    el = el.parentElement;
-  }
-  return false;
-};
-  // Touch guard state for sidebar gesture lock
-  const [lockSidebarGesture, setLockSidebarGesture] = useState(false);
-  const touchStartX = useRef(0);
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense, startTransition } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
@@ -156,23 +142,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
-      const target = e.target as HTMLElement;
-      touchStartX.current = e.touches[0].clientX;
-      if (isHorizontallyScrollable(target)) {
-        setLockSidebarGesture(true);
-      } else {
-        setLockSidebarGesture(false);
-      }
       touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     };
     const handleTouchEnd = (e: TouchEvent) => {
-      setLockSidebarGesture(false);
       if (!touchStartRef.current) return;
       const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
       const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
       if (dy < 100) {
-        if (dx > 80 && !isSidebarOpen && !lockSidebarGesture) setIsSidebarOpen(true);
-        else if (dx < -80 && isSidebarOpen && !lockSidebarGesture) setIsSidebarOpen(false);
+        if (dx > 80 && !isSidebarOpen) setIsSidebarOpen(true); 
+        else if (dx < -80 && isSidebarOpen) setIsSidebarOpen(false); 
       }
       touchStartRef.current = null;
     };
@@ -182,7 +160,7 @@ const App: React.FC = () => {
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isSidebarOpen, lockSidebarGesture]);
+  }, [isSidebarOpen]);
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
 
