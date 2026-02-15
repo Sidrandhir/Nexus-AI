@@ -23,7 +23,10 @@
     "react-markdown": "^10.1.0",
     "recharts": "^2.12.7",
     "remark-gfm": "^4.0.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
