@@ -801,7 +801,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
             disabled={isDisabled}
             rows={1}
             aria-label="Chat message input"
-            className="flex-1 bg-transparent text-[var(--text-primary)] py-2.5 sm:py-3 px-1 sm:px-2 focus:outline-none resize-none transition-all placeholder:text-[var(--text-secondary)]/40 text-[15px] sm:text-base leading-relaxed overflow-hidden overflow-y-auto"
+            className="flex-1 bg-transparent text-[var(--text-primary)] py-2.5 sm:py-3 px-1 sm:px-2 focus:outline-none resize-none transition-all placeholder:text-[var(--text-secondary)]/40 text-[16px] sm:text-base leading-relaxed overflow-hidden overflow-y-auto"
           />
 
           {/* Right side buttons */}
@@ -846,9 +846,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
           </div>
         </div>
       </div>
-      <p className="text-center text-[12px] sm:text-[13px] text-[var(--text-secondary)]/50 mt-2 max-w-3xl mx-auto leading-relaxed">
-        Nexus AI may generate imperfect outputs. Always verify critical information.
-      </p>
+      {/* Caution message removed as requested */}
     </div>
   );
 };
