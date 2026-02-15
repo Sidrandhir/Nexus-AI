@@ -293,8 +293,43 @@ const ProductGrid = memo(({ dataStr }: { dataStr: string }) => {
 const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; className?: string }) => {
   const [copied, setCopied] = useState(false);
   const codeRef = useRef<HTMLElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const language = className?.replace('language-', '') || '';
   const codeString = String(children).replace(/\n$/, '');
+  // Touch lock logic for horizontal scroll
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let startX = 0;
+    let startY = 0;
+    let isScrolling = false;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      isScrolling = false;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const dx = Math.abs(e.touches[0].clientX - startX);
+      const dy = Math.abs(e.touches[0].clientY - startY);
+      if (!isScrolling && dx > 10 && dx > dy && el.scrollWidth > el.clientWidth) {
+        isScrolling = true;
+        window.__sidebarGestureLock = true;
+      }
+    };
+    const onTouchEnd = () => {
+      setTimeout(() => { window.__sidebarGestureLock = false; }, 80);
+    };
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: true });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []);
   if (className === 'language-chart') return <EnhancedChart dataStr={codeString} />;
   if (language === 'mermaid') return <MermaidBlock code={codeString} />;
   if (language === 'products') return <ProductGrid dataStr={codeString} />;
@@ -344,7 +379,7 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   }, [codeString, language]);
 
   return (
-    <div className="relative group/code my-6 border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--code-bg)] shadow-sm max-w-full transition-all hover:border-[var(--text-secondary)]/20">
+    <div ref={containerRef} className="relative group/code my-6 border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--code-bg)] shadow-sm max-w-full transition-all hover:border-[var(--text-secondary)]/20">
       <div className="flex items-center justify-between px-4 py-2 bg-[var(--code-header)] border-b border-[var(--border)]">
         <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] opacity-50">{language || 'SOURCE'}</span>
         <div className="flex items-center gap-3">

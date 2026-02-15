@@ -56,6 +56,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
   }, []);
 
+
   // Escape key closes mobile sidebar overlay
   useEffect(() => {
     if (!isOpen) return;
@@ -65,6 +66,15 @@ const Sidebar: React.FC<SidebarProps> = ({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onToggle]);
+
+  // Prevent sidebar open gesture if horizontal scroll lock is active (mobile)
+  const safeOnToggle = useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 640 && window.__sidebarGestureLock) {
+      // Ignore sidebar open if lock is set
+      return;
+    }
+    onToggle();
+  }, [onToggle]);
 
 
 
