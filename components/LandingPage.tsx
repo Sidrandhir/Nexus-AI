@@ -231,7 +231,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               { num: '02', icon: '🧠', title: 'Nexus reads your intent', desc: 'Our engine classifies what you need — reasoning, precision, or speed — in milliseconds.' },
               { num: '03', icon: '✨', title: 'Best answer. First try.', desc: 'The right intelligence activates. Accurate, contextual response. No tool-switching.' },
             ].map((step, i) => (
-              <div key={step.num} className={`step-card ${isVisible('how-it-works') ? 'visible' : ''} step-delay-${i}`}
+              <div key={step.num} className={`step-card ${isVisible('how-it-works') ? 'visible' : ''} step-delay-${i}`}>
                 <div className="step-number">{step.num}</div>
                 <div className="step-icon">{step.icon}</div>
                 <h3 className="step-title">{step.title}</h3>
@@ -256,7 +256,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               { icon: '⚡', title: 'Coding & Writing', desc: 'Implementation, debugging, documentation, structured writing. Technical precision on demand.', tags: ['Write code', 'Fix bugs', 'Draft docs'], gradient: 'cap-gradient-2' },
               { icon: '🔍', title: 'Search & Speed', desc: 'Real-time answers, live web search, image understanding, quick summaries. Instant intelligence.', tags: ['Live search', 'Quick facts', 'Summarize'], gradient: 'cap-gradient-3' },
             ].map((cap, i) => (
-              <div key={cap.title} className={`cap-card ${cap.gradient} ${isVisible('capabilities') ? 'visible' : ''} cap-delay-${i}`}
+              <div key={cap.title} className={`cap-card ${cap.gradient} ${isVisible('capabilities') ? 'visible' : ''} cap-delay-${i}`}>
                 <div className="cap-icon-large">{cap.icon}</div>
                 <h3 className="cap-title">{cap.title}</h3>
                 <p className="cap-desc">{cap.desc}</p>
@@ -284,7 +284,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
                 <li><span className="pain-icon-bad">😤</span>Copy-paste context between tools. Lose your flow.</li>
               </ul>
             </div>
-            <div className={`pain-card pain-new ${isVisible('why-nexus') ? 'visible' : ''} pain-delay`}
+            <div className={`pain-card pain-new ${isVisible('why-nexus') ? 'visible' : ''} pain-delay`}>
               <div className="pain-header-bar pain-green"><span className="pain-check">✓</span> With Nexus</div>
               <ul className="pain-list">
                 <li><span className="pain-icon-good">⚡</span>One input. Best answer. First try. Every time.</li>
@@ -314,7 +314,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
               { icon: '🔄', title: 'Smart follow-ups', desc: 'AI suggests the next best question. Keeps your momentum going.' },
               { icon: '🌗', title: 'Light & dark', desc: 'Professional interface in both themes. Built for all-day use.' },
             ].map((feat, i) => (
-              <div key={feat.title} className={`feature-card ${isVisible('features') ? 'visible' : ''} feature-delay-${i}`}
+              <div key={feat.title} className={`feature-card ${isVisible('features') ? 'visible' : ''} feature-delay-${i}`}>
                 <div className="feature-icon">{feat.icon}</div>
                 <h3 className="feature-title">{feat.title}</h3>
                 <p className="feature-desc">{feat.desc}</p>
