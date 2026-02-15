@@ -801,7 +801,7 @@ const hasAttachments = imagePreview || attachedDocs.length > 0;
             disabled={isDisabled}
             rows={1}
             aria-label="Chat message input"
-            className="flex-1 bg-transparent text-[var(--text-primary)] py-2.5 sm:py-3 px-1 sm:px-2 focus:outline-none resize-none transition-all placeholder:text-[var(--text-secondary)]/40 text-[16px] sm:text-base leading-relaxed overflow-hidden overflow-y-auto"
+            className="flex-1 bg-transparent text-[var(--text-primary)] py-2.5 sm:py-3 px-1 sm:px-2 focus:outline-none resize-none transition-all placeholder:text-[var(--text-secondary)]/40 text-[15px] sm:text-base leading-relaxed overflow-hidden overflow-y-auto"
           />
 
           {/* Right side buttons */}
