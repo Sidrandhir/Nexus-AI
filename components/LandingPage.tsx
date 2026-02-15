@@ -108,11 +108,15 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       {/* Particles */}
       <div className="particles-container">
         {[...Array(16)].map((_, i) => (
-          <div key={i} className="particle particle-style"
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 14}s`,
-            animationDuration: `${14 + Math.random() * 16}s`,
-          }} />
+          <div
+            key={i}
+            className="particle particle-style"
+            style={{
+              left: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 14}s`,
+              animationDuration: `${14 + Math.random() * 16}s`,
+            }}
+          />
         ))}
       </div>
 
