@@ -1,3 +1,9 @@
+// Fix: Declare window.__sidebarGestureLock for TypeScript
+declare global {
+  interface Window {
+    __sidebarGestureLock?: boolean;
+  }
+}
 import React, { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react';
 import { Message, AIModel, RouterResult, ChatSession, GroundingChunk } from '../types';
 import { Icons } from '../constants';

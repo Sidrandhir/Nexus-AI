@@ -1,3 +1,67 @@
+// VISUAL HIERARCHY RULE — For clean, professional explanations
+const VISUAL_HIERARCHY_RULE = [
+  'CRITICAL FORMATTING RULE: Proper Visual Hierarchy',
+  '',
+  'Use a clear visual hierarchy with sections, paragraphs, and sub-points.',
+  '',
+  '## Format Structure:',
+  '1. Section headers (##) for main topics',
+  '2. Introductory paragraph (2-3 sentences)',
+  '3. Bold category/concept names (**Name:**)',
+  '4. Paragraph explanation for each category (2-4 sentences)',
+  '5. Bullet lists ONLY for specific points/features',
+  '6. Key differences and recommendations at the end',
+  '',
+  '## Spacing Rules:',
+  '1. ONE blank line after section headers (##)',
+  '2. ONE blank line after category names (**Name:**)',
+  '3. NO blank line between bullet points in a list',
+  '4. ONE blank line between different categories',
+  '5. Paragraphs should be 2-4 sentences each',
+  '',
+  '## Paragraph Writing Rules:',
+  '1. Write explanation PARAGRAPHS, not bullet lists',
+  '2. Each paragraph should be 2-4 sentences',
+  '3. Use bullets ONLY for listing specific points/features',
+  '4. Explanation comes BEFORE the bullet list',
+  '',
+  '## Visual Hierarchy Template:',
+  '## [Main Topic]',
+  '[2-3 sentence introduction explaining the overall concept]',
+  '',
+  '**[Concept/Option A]:**',
+  '[2-4 sentence explanation in paragraph form, providing context and detail about this specific concept or option.]',
+  '',
+  'Key characteristics/features:',
+  '- **Label:** Description',
+  '- **Label:** Description',
+  '- **Label:** Description',
+  '',
+  '**[Concept/Option B]:**',
+  '[2-4 sentence explanation in paragraph form.]',
+  '',
+  'Key characteristics/features:',
+  '- **Label:** Description',
+  '- **Label:** Description',
+  '- **Label:** Description',
+  '',
+  '**Key Differences:**',
+  '[Paragraph explaining the main distinctions]',
+  '',
+  '## When to Choose Which',
+  '',
+  '**Choose [Option A] if:**',
+  '- Criterion 1',
+  '- Criterion 2',
+  '- Criterion 3',
+  '',
+  '**Choose [Option B] if:**',
+  '- Criterion 1',
+  '- Criterion 2',
+  '- Criterion 3',
+  '',
+  'APPLY THIS TO ALL EXPLANATORY RESPONSES STARTING NOW.'
+].join('\n');
 // SPECIAL RULE: Nexus AI identity questions — always give full response
 const SPECIAL_NEXUS_IDENTITY_RULE = [
   'SPECIAL RULE: Questions About Nexus AI',
@@ -1439,7 +1503,7 @@ const buildSystemInstruction = (
   personification: string,
   isProductQuery: boolean
 ): string => {
-  const parts: string[] = [SPECIAL_NEXUS_IDENTITY_RULE, NEXUS_IDENTITY, SYSTEM_CORE, FORMATTING_RULES, SIMPLE_FORMATTING_RULES, TABLE_FORMATTING_RULE];
+  const parts: string[] = [SPECIAL_NEXUS_IDENTITY_RULE, NEXUS_IDENTITY, SYSTEM_CORE, FORMATTING_RULES, SIMPLE_FORMATTING_RULES, TABLE_FORMATTING_RULE, VISUAL_HIERARCHY_RULE];
 
   // Intent-specific addendum — ONLY the relevant one
 
@@ -1455,12 +1519,13 @@ const buildSystemInstruction = (
       break;
     case 'math':
       parts.push(MATH_ADDENDUM);
-      parts.push(CLEAN_FORMAT_RULE);
+      // CLEAN_FORMAT_RULE removed: not defined or needed
       break;
     case 'physics':
       parts.push(PHYSICS_ADDENDUM);
-      parts.push(CLEAN_FORMAT_RULE);
-      break;
+    // case 'physics':
+    //   parts.push(CLEAN_FORMAT_RULE);
+    //   break;
   }
 
   // Product addendum ONLY when it's actually a product query
