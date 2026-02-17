@@ -1,9 +1,6 @@
-// Fix: Declare window.__sidebarGestureLock for TypeScript
-declare global {
-  interface Window {
-    __sidebarGestureLock?: boolean;
-  }
-}
+
+// ...existing code...
+
 import React, { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react';
 import { Message, AIModel, RouterResult, ChatSession, GroundingChunk } from '../types';
 import { Icons } from '../constants';
@@ -12,10 +9,34 @@ import remarkGfm from 'remark-gfm';
 import './ChatArea.css';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
-import { 
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
-  BarChart, Bar, LineChart, Line 
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  BarChart, Bar, LineChart, Line
 } from 'recharts';
+
+// Fix: Declare window.__sidebarGestureLock for TypeScript
+declare global {
+  interface Window {
+    __sidebarGestureLock?: boolean;
+  }
+}
+
+// Stable tooltip component (prevents re-creation every render)
+const ChartTooltip = React.memo(({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border)] p-3 rounded-lg shadow-xl">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-0.5">
+          {label}
+        </p>
+        <p className="text-sm font-bold text-[var(--text-primary)]">
+          {payload[0].value}
+        </p>
+      </div>
+    );
+  }
+  return null;
+});
 
 interface ChatAreaProps {
   session: ChatSession;
@@ -58,20 +79,27 @@ const fallbackCopy = (text: string) => {
 // iOS-safe file download — uses navigator.share on iOS Safari where <a download> is ignored
 const downloadFile = (blob: Blob, filename: string) => {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (isIOS && navigator.share && navigator.canShare?.({ files: [new File([blob], filename)] })) {
-    navigator.share({ files: [new File([blob], filename, { type: blob.type })] }).catch(() => {
-      // User cancelled share — fallback to opening in new tab
-      window.open(URL.createObjectURL(blob), '_blank');
-    });
+  const url = URL.createObjectURL(blob);
+  if (isIOS) {
+    // Try native share if available
+    if (navigator.share && navigator.canShare?.({ files: [new File([blob], filename)] })) {
+      navigator.share({ files: [new File([blob], filename, { type: blob.type })] }).catch(() => {
+        // Fallback: open in new tab (iOS Safari will preview most files)
+        window.open(url, '_blank');
+      });
+    } else {
+      // Fallback: open in new tab (iOS Safari will preview most files)
+      window.open(url, '_blank');
+    }
+    // Don't revoke URL immediately for iOS, let browser handle it
   } else {
-    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 };
 
@@ -107,17 +135,6 @@ const EnhancedChart = ({ dataStr }: { dataStr: string }) => {
     const config = JSON.parse(dataStr);
     const { type = 'area', data, label = 'Data Insights' } = config;
     const accentColor = 'var(--accent)';
-    const CustomTooltip = ({ active, payload, label }: any) => {
-      if (active && payload && payload.length) {
-        return (
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] p-3 rounded-lg shadow-xl">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-0.5">{label}</p>
-            <p className="text-sm font-bold text-[var(--text-primary)]">{payload[0].value}</p>
-          </div>
-        );
-      }
-      return null;
-    };
     return (
       <div className="my-6 p-4 sm:p-6 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]/20 relative overflow-hidden group/chart transition-all">
         <div className="mb-4 flex justify-between items-center opacity-60"><h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">{label}</h4></div>
@@ -128,7 +145,7 @@ const EnhancedChart = ({ dataStr }: { dataStr: string }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--bg-tertiary)', opacity: 0.2 }} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--bg-tertiary)', opacity: 0.2 }} />
                 <Bar dataKey="value" fill={accentColor} radius={[4, 4, 0, 0]} />
               </BarChart>
             ) : type === 'line' ? (
@@ -136,7 +153,7 @@ const EnhancedChart = ({ dataStr }: { dataStr: string }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<ChartTooltip />} />
                 <Line type="monotone" dataKey="value" stroke={accentColor} strokeWidth={2.5} dot={{ r: 2.5, fill: 'var(--bg-primary)', strokeWidth: 1.5 }} activeDot={{ r: 4 }} />
               </LineChart>
             ) : (
@@ -145,7 +162,7 @@ const EnhancedChart = ({ dataStr }: { dataStr: string }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<ChartTooltip />} />
                 <Area type="monotone" dataKey="value" stroke={accentColor} strokeWidth={2.5} fillOpacity={1} fill="url(#colorVal)" />
               </AreaChart>
             )}
@@ -306,15 +323,18 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+
     let startX = 0;
     let startY = 0;
     let isScrolling = false;
+
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       isScrolling = false;
     };
+
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
       const dx = Math.abs(e.touches[0].clientX - startX);
@@ -324,18 +344,22 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
         window.__sidebarGestureLock = true;
       }
     };
+
     const onTouchEnd = () => {
       setTimeout(() => { window.__sidebarGestureLock = false; }, 80);
     };
+
     el.addEventListener('touchstart', onTouchStart, { passive: true });
     el.addEventListener('touchmove', onTouchMove, { passive: true });
     el.addEventListener('touchend', onTouchEnd, { passive: true });
+
     return () => {
       el.removeEventListener('touchstart', onTouchStart);
       el.removeEventListener('touchmove', onTouchMove);
       el.removeEventListener('touchend', onTouchEnd);
     };
   }, []);
+
   if (className === 'language-chart') return <EnhancedChart dataStr={codeString} />;
   if (language === 'mermaid') return <MermaidBlock code={codeString} />;
   if (language === 'products') return <ProductGrid dataStr={codeString} />;
@@ -373,14 +397,25 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
 
   // Memoize syntax highlighting — only recompute when code content changes
   const highlightedHtml = useMemo(() => {
+    if (!codeString) return '';
+
+    if (codeString.length > 20000) {
+      return codeString.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    // Device-aware: skip highlight.js on weak CPUs
+    if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) {
+      return codeString.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
     try {
       if (language && hljs.getLanguage(language)) {
-        return hljs.highlight(codeString, { language }).value;
-      } else {
-        return hljs.highlightAuto(codeString).value;
+        return hljs.highlight(codeString, {
+          language,
+          ignoreIllegals: true
+        }).value;
       }
+      return hljs.highlightAuto(codeString).value;
     } catch {
-      return codeString;
+      return codeString.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
   }, [codeString, language]);
 
@@ -478,7 +513,7 @@ const MessageItem = memo(({ msg, isLast, isLoading, copiedId, editingId, editCon
               <div className="flex gap-2"><button onClick={() => onSubmitEdit(msg.id)} className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-xl text-[13px] sm:text-sm font-semibold active:scale-95 transition-all shadow-lg shadow-[var(--accent)]/10">Update</button><button onClick={onCancelEdit} className="px-5 py-2.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] rounded-xl text-[13px] sm:text-sm font-semibold border border-[var(--border)] active:scale-95 transition-all">Cancel</button></div>
             </div>
           ) : (
-            <div className="markdown-body"><ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>{msg.content}</ReactMarkdown></div>
+            <div className="markdown-body"><ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>{typeof msg.content === 'string' ? msg.content : (msg.content ? String(msg.content) : '')}</ReactMarkdown></div>
           )}
           {msg.image && <div className="mt-8 rounded-xl overflow-hidden border border-[var(--border)] shadow-xl"><img src={`data:${msg.image.mimeType};base64,${msg.image.inlineData.data}`} alt="Context Attached" className="max-w-full h-auto" /></div>}
           {msg.groundingChunks && msg.groundingChunks.length > 0 && (
@@ -615,62 +650,74 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       .replace(/\n/g, ' ')
       .trim();
   }, []);
+  // Handle scroll to manage auto-scroll and showScrollDown
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const isNearBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+
+    setAutoScroll(isNearBottom);
+    setShowScrollDown(!isNearBottom);
+  }, []);
 
   // TTS: speak or stop a message
   const speakMessage = useCallback((msgId: string, text: string) => {
     const synth = window.speechSynthesis;
-    if (speakingMsgId === msgId) {
-      synth.cancel();
+    try {
+      if (speakingMsgId === msgId) {
+        synth.cancel();
+        setSpeakingMsgId(null);
+        utteranceRef.current = null;
+        return;
+      }
+      synth.cancel(); // Always cancel before starting new utterance
+      const cleaned = stripMarkdown(text);
+      if (!cleaned) return;
+
+      const doSpeak = () => {
+        const utterance = new SpeechSynthesisUtterance(cleaned);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        // Pick a good voice if available (prefer en-US, avoid novelty voices)
+        const voices = synth.getVoices();
+        const preferred = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google'))
+          || voices.find(v => v.lang.startsWith('en-US') && !v.localService)
+          || voices.find(v => v.lang.startsWith('en'));
+        if (preferred) utterance.voice = preferred;
+        utterance.onend = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
+        utterance.onerror = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
+        utteranceRef.current = utterance;
+        setSpeakingMsgId(msgId);
+        // Chrome workaround: cancel + small delay before speaking
+        synth.cancel();
+        setTimeout(() => synth.speak(utterance), 50);
+      };
+
+      if (synth.getVoices().length === 0) {
+        // Voices not loaded yet — wait for voiceschanged
+        let spoken = false;
+        const onVoicesChanged = () => {
+          synth.removeEventListener('voiceschanged', onVoicesChanged);
+          if (!spoken) { spoken = true; doSpeak(); }
+        };
+        synth.addEventListener('voiceschanged', onVoicesChanged);
+        // Fallback: if voiceschanged never fires (Firefox), try after 500ms anyway
+        setTimeout(() => {
+          synth.removeEventListener('voiceschanged', onVoicesChanged);
+          if (!spoken) { spoken = true; doSpeak(); }
+        }, 500);
+      } else {
+        doSpeak();
+      }
+    } catch (err) {
       setSpeakingMsgId(null);
       utteranceRef.current = null;
-      return;
-    }
-    synth.cancel();
-    const cleaned = stripMarkdown(text);
-    if (!cleaned) return;
-
-    // Chrome desktop bug: voices may not be loaded yet.
-    // If no voices, wait for them, then retry once.
-    const doSpeak = () => {
-      const utterance = new SpeechSynthesisUtterance(cleaned);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      // Pick a good voice if available (prefer en-US, avoid novelty voices)
-      const voices = synth.getVoices();
-      const preferred = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) 
-        || voices.find(v => v.lang.startsWith('en-US') && !v.localService)
-        || voices.find(v => v.lang.startsWith('en'));
-      if (preferred) utterance.voice = preferred;
-      utterance.onend = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
-      utterance.onerror = (e) => { 
-        // 'interrupted' and 'canceled' are normal when user stops
-        if (e.error !== 'interrupted' && e.error !== 'canceled') {
-          setSpeakingMsgId(null); 
-          utteranceRef.current = null; 
-        }
-      };
-      utteranceRef.current = utterance;
-      setSpeakingMsgId(msgId);
-      // Chrome workaround: cancel + small delay before speaking
-      synth.cancel();
-      setTimeout(() => synth.speak(utterance), 50);
-    };
-
-    if (synth.getVoices().length === 0) {
-      // Voices not loaded yet — wait for voiceschanged
-      let spoken = false;
-      const onVoicesChanged = () => {
-        synth.removeEventListener('voiceschanged', onVoicesChanged);
-        if (!spoken) { spoken = true; doSpeak(); }
-      };
-      synth.addEventListener('voiceschanged', onVoicesChanged);
-      // Fallback: if voiceschanged never fires (Firefox), try after 500ms anyway
-      setTimeout(() => {
-        synth.removeEventListener('voiceschanged', onVoicesChanged);
-        if (!spoken) { spoken = true; doSpeak(); }
-      }, 500);
-    } else {
-      doSpeak();
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.error('Speech synthesis error:', err);
+      }
     }
   }, [speakingMsgId, stripMarkdown]);
 
@@ -679,34 +726,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     return () => {
       window.speechSynthesis.cancel();
       setSpeakingMsgId(null);
-      cancelAnimationFrame(scrollRafRef.current);
-      cancelAnimationFrame(autoScrollRafRef.current);
+      if (scrollRafRef.current != null) {
+        cancelAnimationFrame(scrollRafRef.current);
+      }
+      if (autoScrollRafRef.current != null) {
+        cancelAnimationFrame(autoScrollRafRef.current);
+      }
     };
   }, [session?.id]);
 
   useEffect(() => {
     if (scrollRef.current && autoScroll) {
-      cancelAnimationFrame(autoScrollRafRef.current);
-      autoScrollRafRef.current = requestAnimationFrame(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTo({
-            top: scrollRef.current.scrollHeight,
-            behavior: isLoading ? 'auto' : 'smooth'
-          });
-        }
-      });
+      // Direct assignment: no animation, prevents layout bugs during streaming
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading, autoScroll]);
-
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    cancelAnimationFrame(scrollRafRef.current);
-    scrollRafRef.current = requestAnimationFrame(() => {
-      const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 100;
-      setAutoScroll(isAtBottom);
-      setShowScrollDown(!isAtBottom);
-    });
-  }, []);
 
   const handleCopyText = useCallback((text: string, id: string) => {
     copyToClipboard(text);
@@ -782,7 +816,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           <Icons.Download className="w-4 h-4" />
         </button>
       </div>
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-2 sm:px-0 py-8 sm:py-14 touch-action-pan-y overscroll-behavior-contain">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar chatarea-scroll touch-action-pan-y overscroll-behavior-contain"
+      >
         <div className="max-w-[900px] w-full mx-auto flex flex-col gap-12 pb-32">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center pt-32 text-center animate-in fade-in duration-1000">
@@ -820,10 +858,19 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       </div>
       {showScrollDown && (
-        <button onClick={() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })} aria-label="Scroll to latest message" className="absolute bottom-8 right-8 sm:right-12 w-11 h-11 rounded-full glass border border-[var(--border)] flex items-center justify-center text-[var(--text-primary)] shadow-2xl z-20 hover:scale-110 active:scale-90 transition-all"><svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 13l5 5 5-5M7 6l5 5 5-5" /></svg></button>
+        <button
+          onClick={() => {
+            if (scrollRef.current) {
+              scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }
+          }}
+          aria-label="Scroll to latest message"
+          className="scroll-to-bottom-btn-center"
+        >
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 13l5 5 5-5M7 6l5 5 5-5" /></svg>
+        </button>
       )}
     </div>
   );
 };
-
 export default ChatArea;
