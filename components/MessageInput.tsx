@@ -1,3 +1,4 @@
+// This file is deprecated and replaced by ChatInputFloating. Safe to remove.
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';

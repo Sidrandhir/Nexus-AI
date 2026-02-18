@@ -1,44 +1,26 @@
-
-// ...existing code...
-
-import React, { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react';
+import React, {
+  useRef, useEffect, useState, useCallback, useMemo, memo,
+} from 'react';
 import { Message, AIModel, RouterResult, ChatSession, GroundingChunk } from '../types';
 import { Icons } from '../constants';
-import NexusLogo from '../public/nexus-logo-modern.svg';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './ChatArea.css';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
+import { ConfidenceBadge } from './ConfidenceBadge';
+import type { ConfidenceSignal } from '../services/aiService';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  BarChart, Bar, LineChart, Line
+  BarChart, Bar, LineChart, Line,
 } from 'recharts';
 
-// Fix: Declare window.__sidebarGestureLock for TypeScript
+// ── Global type augmentation ──────────────────────────────────────
 declare global {
-  interface Window {
-    __sidebarGestureLock?: boolean;
-  }
+  interface Window { __sidebarGestureLock?: boolean; }
 }
 
-// Stable tooltip component (prevents re-creation every render)
-const ChartTooltip = React.memo(({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border)] p-3 rounded-lg shadow-xl">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-0.5">
-          {label}
-        </p>
-        <p className="text-sm font-bold text-[var(--text-primary)]">
-          {payload[0].value}
-        </p>
-      </div>
-    );
-  }
-  return null;
-});
-
+// ── Types ─────────────────────────────────────────────────────────
 interface ChatAreaProps {
   session: ChatSession;
   isLoading: boolean;
@@ -57,17 +39,19 @@ interface ChatAreaProps {
   onSuggestionClick?: (text: string) => void;
 }
 
-// Cross-platform clipboard helper — falls back to execCommand for insecure contexts (HTTP, WebViews)
-const copyToClipboard = (text: string) => {
+// ═══════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════
+
+const copyToClipboard = (text: string): void => {
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).catch(() => {
-      fallbackCopy(text);
-    });
+    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
   } else {
     fallbackCopy(text);
   }
 };
-const fallbackCopy = (text: string) => {
+
+const fallbackCopy = (text: string): void => {
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
@@ -77,22 +61,19 @@ const fallbackCopy = (text: string) => {
   document.body.removeChild(ta);
 };
 
-// iOS-safe file download — uses navigator.share on iOS Safari where <a download> is ignored
-const downloadFile = (blob: Blob, filename: string) => {
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const downloadFile = (blob: Blob, filename: string): void => {
+  const isIOS =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const url = URL.createObjectURL(blob);
+
   if (isIOS) {
-    // Try native share if available
     if (navigator.share && navigator.canShare?.({ files: [new File([blob], filename)] })) {
-      navigator.share({ files: [new File([blob], filename, { type: blob.type })] }).catch(() => {
-        // Fallback: open in new tab (iOS Safari will preview most files)
-        window.open(url, '_blank');
-      });
+      navigator.share({ files: [new File([blob], filename, { type: blob.type })] })
+        .catch(() => window.open(url, '_blank'));
     } else {
-      // Fallback: open in new tab (iOS Safari will preview most files)
       window.open(url, '_blank');
     }
-    // Don't revoke URL immediately for iOS, let browser handle it
   } else {
     const a = document.createElement('a');
     a.href = url;
@@ -104,114 +85,126 @@ const downloadFile = (blob: Blob, filename: string) => {
   }
 };
 
-const EnhancedTable = ({ children, ...props }: any) => {
-  const [copied, setCopied] = useState(false);
-  const tableRef = useRef<HTMLTableElement>(null);
-  const handleCopyData = () => {
-    if (!tableRef.current) return;
-    const rows = Array.from(tableRef.current.querySelectorAll('tr')) as HTMLTableRowElement[];
-    const tsv = rows.map(row => {
-      const cells = Array.from(row.querySelectorAll('th, td')) as HTMLElement[];
-      return cells.map(cell => cell.innerText.trim()).join('\t');
-    }).join('\n');
-    copyToClipboard(tsv);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+const stripMarkdown = (text: string): string =>
+  text
+    .replace(/```[\s\S]*?```/g, '. code block omitted. ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+    .replace(/^\s*[-*+]\s/gm, '')
+    .replace(/^\s*\d+\.\s/gm, '')
+    .replace(/^\s*>\s/gm, '')
+    .replace(/---/g, '')
+    .replace(/\|[^\n]+\|/g, '')
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, ' ')
+    .trim();
+
+// ═══════════════════════════════════════════════════════════════════
+// SUB-COMPONENTS
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Chart tooltip ─────────────────────────────────────────────────
+const ChartTooltip = memo(({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
   return (
-    <div className="group/table relative my-6 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-tertiary)]/5 transition-all hover:border-[var(--text-secondary)]/30 shadow-sm">
-      <div className="absolute top-2 right-2 z-10 opacity-0 group-hover/table:opacity-100 transition-opacity">
-        <button onClick={handleCopyData} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all active:scale-95">
-          {copied ? <Icons.Check className="w-3 h-3" /> : <Icons.Copy className="w-3 h-3" />}
-          {copied ? 'Copied' : 'Copy'}
-        </button>
-      </div>
-      <div className="overflow-x-auto custom-scrollbar"><table ref={tableRef} className="w-full">{children}</table></div>
+    <div style={{
+      background: 'var(--bg-secondary)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
+      padding: '8px 12px',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+    }}>
+      <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', marginBottom: 2 }}>{label}</p>
+      <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{payload[0].value}</p>
     </div>
   );
-};
+});
 
-const EnhancedChart = ({ dataStr }: { dataStr: string }) => {
+// ── Chart block ───────────────────────────────────────────────────
+const EnhancedChart = memo(({ dataStr }: { dataStr: string }) => {
   try {
-    const config = JSON.parse(dataStr);
-    const { type = 'area', data, label = 'Data Insights' } = config;
-    const accentColor = 'var(--accent)';
+    const { type = 'area', data, label = 'Data' } = JSON.parse(dataStr);
+    const accent = 'var(--accent)';
+    const chartProps = {
+      data,
+      margin: { top: 8, right: 8, left: -20, bottom: 0 },
+    };
+    const axisProps = {
+      axisLine: false,
+      tickLine: false,
+      tick: { fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 600 },
+    };
+
     return (
-      <div className="my-6 p-4 sm:p-6 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]/20 relative overflow-hidden group/chart transition-all">
-        <div className="mb-4 flex justify-between items-center opacity-60"><h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">{label}</h4></div>
-        <div className="h-56 sm:h-64 w-full">
+      <div style={{
+        margin: '1.25em 0',
+        padding: '20px 24px',
+        borderRadius: 16,
+        border: '1px solid var(--border)',
+        background: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
+      }}>
+        <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', marginBottom: 16, opacity: 0.6 }}>{label}</p>
+        <div style={{ height: 220, width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
             {type === 'bar' ? (
-              <BarChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+              <BarChart {...chartProps}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--bg-tertiary)', opacity: 0.2 }} />
-                <Bar dataKey="value" fill={accentColor} radius={[4, 4, 0, 0]} />
+                <XAxis dataKey="name" {...axisProps} dy={8} />
+                <YAxis {...axisProps} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                <Bar dataKey="value" fill={accent} radius={[4, 4, 0, 0]} />
               </BarChart>
             ) : type === 'line' ? (
-              <LineChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+              <LineChart {...chartProps}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} />
+                <XAxis dataKey="name" {...axisProps} dy={8} />
+                <YAxis {...axisProps} />
                 <Tooltip content={<ChartTooltip />} />
-                <Line type="monotone" dataKey="value" stroke={accentColor} strokeWidth={2.5} dot={{ r: 2.5, fill: 'var(--bg-primary)', strokeWidth: 1.5 }} activeDot={{ r: 4 }} />
+                <Line type="monotone" dataKey="value" stroke={accent} strokeWidth={2} dot={{ r: 3, fill: 'var(--bg-primary)', strokeWidth: 2 }} activeDot={{ r: 4 }} />
               </LineChart>
             ) : (
-              <AreaChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                <defs><linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={accentColor} stopOpacity={0.15}/><stop offset="95%" stopColor={accentColor} stopOpacity={0}/></linearGradient></defs>
+              <AreaChart {...chartProps}>
+                <defs>
+                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor={accent} stopOpacity={0.12} />
+                    <stop offset="95%" stopColor={accent} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} />
+                <XAxis dataKey="name" {...axisProps} dy={8} />
+                <YAxis {...axisProps} />
                 <Tooltip content={<ChartTooltip />} />
-                <Area type="monotone" dataKey="value" stroke={accentColor} strokeWidth={2.5} fillOpacity={1} fill="url(#colorVal)" />
+                <Area type="monotone" dataKey="value" stroke={accent} strokeWidth={2} fillOpacity={1} fill="url(#areaGrad)" />
               </AreaChart>
             )}
           </ResponsiveContainer>
         </div>
       </div>
     );
-  } catch (err) { return null; }
-};
+  } catch {
+    return null;
+  }
+});
 
-const MermaidBlock = ({ code }: { code: string }) => {
-  const [svg, setSvg] = useState<string>('');
-  const [error, setError] = useState<string>('');
+// ── Mermaid diagram ───────────────────────────────────────────────
+const MermaidBlock = memo(({ code }: { code: string }) => {
+  const [svg, setSvg] = useState('');
+  const [error, setError] = useState('');
 
-  // Sanitize Mermaid code: escape unquoted parentheses inside node labels
-  // that Mermaid misinterprets as shape delimiters (e.g., "(Auth, User Profiles)")
-  const sanitizeMermaidCode = (raw: string): string => {
-    return raw.replace(
-      // Match node definitions like:  nodeId[Label text(something)] or nodeId(Label(something))
-      // Captures lines with node labels containing nested parens
-      /^(\s*\w[\w\d_-]*)\s*(\[|[\(])(.+?)(\]|[\)])(\s*$)/gm,
-      (match, nodeId, openShape, label, closeShape, trailing) => {
-        // If already quoted, leave it alone
-        if (label.startsWith('"') && label.endsWith('"')) return match;
-        // Escape inner parens inside the label text by wrapping in quotes
-        if (/\(/.test(label) && openShape === '[') {
-          return `${nodeId}${openShape}"${label}"${closeShape}${trailing}`;
-        }
-        return match;
-      }
-    ).replace(
-      // Fix unquoted labels with parens in bracket nodes across multiline: id["text<br>(details)"]
-      // Catch the common AI pattern: id[Text<br>(something, something)]
-      /(\w[\w\d_-]*)\[([^\]"]*\([^\]]*\)[^\]"]*)\]/g,
-      (match, nodeId, label) => {
-        if (label.startsWith('"') && label.endsWith('"')) return match;
-        return `${nodeId}["${label}"]`;
-      }
-    ).replace(
-      // Catch round-bracket shape nodes with inner parens: id(Text<br>(details))
-      // Mermaid can't handle nested () - wrap label in quotes
-      /(\w[\w\d_-]*)\(([^)"]*\([^)]*\)[^)"]*)\)/g,
-      (match, nodeId, label) => {
-        if (label.startsWith('"') && label.endsWith('"')) return match;
-        return `${nodeId}("${label}")`;
-      }
-    );
-  };
+  // Sanitize nested parentheses in node labels
+  const sanitize = (raw: string): string =>
+    raw
+      .replace(/(\w[\w\d_-]*)\[([^\]"]*\([^\]]*\)[^\]"]*)\]/g, (_, id, label) =>
+        label.startsWith('"') ? _ : `${id}["${label}"]`
+      )
+      .replace(/(\w[\w\d_-]*)\(([^)"]*\([^)]*\)[^)"]*)\)/g, (_, id, label) =>
+        label.startsWith('"') ? _ : `${id}("${label}")`
+      );
 
   useEffect(() => {
     let cancelled = false;
@@ -219,93 +212,80 @@ const MermaidBlock = ({ code }: { code: string }) => {
       try {
         const mermaid = (await import('mermaid')).default;
         mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
-        const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
-        const sanitized = sanitizeMermaidCode(code);
-        const { svg: rendered } = await mermaid.render(id, sanitized);
+        const id = 'mermaid-' + Math.random().toString(36).slice(2, 9);
+        const { svg: rendered } = await mermaid.render(id, sanitize(code));
         if (!cancelled) setSvg(rendered);
       } catch (e: any) {
-        if (!cancelled) setError(e.message || 'Invalid Mermaid syntax');
+        if (!cancelled) setError(e.message || 'Invalid diagram syntax');
       }
     })();
     return () => { cancelled = true; };
   }, [code]);
 
-  const handleDownloadSvg = () => {
+  const handleDownload = () => {
     if (!svg) return;
-    const blob = new Blob([svg], { type: 'image/svg+xml' });
-    downloadFile(blob, 'diagram.svg');
+    downloadFile(new Blob([svg], { type: 'image/svg+xml' }), 'diagram.svg');
   };
 
-  if (error) {
-    return <div className="my-6 p-4 rounded-xl border border-red-500/30 bg-red-500/5 text-red-400 text-sm">Diagram error: {error}</div>;
-  }
-
   return (
-    <div className="relative group/mermaid my-6 border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--code-bg)] shadow-sm transition-all hover:border-[var(--text-secondary)]/20">
-      <div className="flex items-center justify-between px-4 py-2 bg-[var(--code-header)] border-b border-[var(--border)]">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] opacity-50">DIAGRAM</span>
+    <div className="nx-diagram">
+      <div className="nx-diagram-header">
+        <span className="nx-code-lang">Diagram</span>
         {svg && (
-          <button onClick={handleDownloadSvg} className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all">
-            <Icons.Download className="w-3 h-3" />
-            Download SVG
+          <button onClick={handleDownload} className="nx-code-btn">
+            <Icons.Download className="icon-12" />
+            SVG
           </button>
         )}
       </div>
-      {svg ? (
-        <div className="p-4 flex justify-center overflow-x-auto custom-scrollbar [&_svg]:max-w-full" dangerouslySetInnerHTML={{ __html: svg }} />
+      {error ? (
+        <div style={{ padding: '16px 20px', color: '#f87171', fontSize: 13 }}>
+          Diagram error: {error}
+        </div>
+      ) : svg ? (
+        <div className="nx-diagram-body" dangerouslySetInnerHTML={{ __html: svg }} />
       ) : (
-        <div className="p-8 flex justify-center"><div className="w-5 h-5 border-2 border-[var(--accent)]/30 border-t-[var(--accent)] rounded-full animate-spin" /></div>
+        <div className="nx-diagram-loading">
+          <div className="nx-spinner" />
+        </div>
       )}
     </div>
   );
-};
+});
 
+// ── Product grid ──────────────────────────────────────────────────
 const ProductGrid = memo(({ dataStr }: { dataStr: string }) => {
   const products = useMemo(() => {
     try {
-      const parsed = JSON.parse(dataStr);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+      const p = JSON.parse(dataStr);
+      return Array.isArray(p) ? p : [];
+    } catch { return []; }
   }, [dataStr]);
 
   if (!products.length) return null;
 
   return (
-    <div className="my-6">
-      <div className="flex items-center gap-2 mb-4">
-        <svg className="w-5 h-5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-        </svg>
-        <span className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Products</span>
+    <div style={{ margin: '1.25em 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+        Products
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="nx-product-grid">
         {products.map((p: any, i: number) => (
-          <a
-            key={i}
-            href={p.url || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex flex-col border border-[var(--border)] rounded-xl p-4 bg-[var(--bg-secondary)] hover:border-[var(--accent)]/50 hover:shadow-lg hover:shadow-[var(--accent)]/5 transition-all duration-200"
-          >
+          <a key={i} href={p.url || '#'} target="_blank" rel="noopener noreferrer" className="nx-product-card">
             {p.image && (
-              <div className="w-full h-32 mb-3 rounded-lg overflow-hidden bg-white flex items-center justify-center">
-                <img src={p.image} alt={p.name} className="max-w-full max-h-full object-contain" loading="lazy" />
+              <div style={{ height: 112, marginBottom: 12, borderRadius: 8, overflow: 'hidden', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src={p.image} alt={p.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} loading="lazy" />
               </div>
             )}
-            <h4 className="text-sm font-bold text-[var(--text-primary)] line-clamp-2 mb-1 group-hover:text-[var(--accent)] transition-colors">{p.name}</h4>
-            {p.description && <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mb-2">{p.description}</p>}
-            <div className="flex items-center justify-between mt-auto pt-2">
-              <span className="text-base font-bold text-[var(--accent)]">{p.price}</span>
-              <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <div className="nx-product-name">{p.name}</div>
+            {p.description && <div className="nx-product-desc">{p.description}</div>}
+            <div className="nx-product-footer">
+              <span className="nx-product-price">{p.price}</span>
+              <div className="nx-product-meta">
                 {p.rating && <span>⭐ {p.rating}</span>}
-                {p.store && <span className="bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full text-[11px]">{p.store}</span>}
+                {p.store && <span className="nx-product-store">{p.store}</span>}
               </div>
-            </div>
-            <div className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity">
-              <span>View Product</span>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
             </div>
           </a>
         ))}
@@ -314,55 +294,57 @@ const ProductGrid = memo(({ dataStr }: { dataStr: string }) => {
   );
 });
 
+// ── Code block ────────────────────────────────────────────────────
+const EXT_MAP: Record<string, string> = {
+  javascript: 'js', typescript: 'ts', python: 'py', java: 'java',
+  cpp: 'cpp', c: 'c', csharp: 'cs', go: 'go', rust: 'rs',
+  ruby: 'rb', php: 'php', swift: 'swift', kotlin: 'kt',
+  html: 'html', css: 'css', scss: 'scss', sql: 'sql',
+  json: 'json', yaml: 'yml', xml: 'xml', markdown: 'md',
+  bash: 'sh', shell: 'sh', powershell: 'ps1', csv: 'csv',
+};
+const MIME_MAP: Record<string, string> = {
+  csv: 'text/csv', json: 'application/json', html: 'text/html',
+  xml: 'application/xml', sql: 'application/sql', markdown: 'text/markdown',
+};
+
 const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; className?: string }) => {
   const [copied, setCopied] = useState(false);
-  const codeRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const language = className?.replace('language-', '') || '';
-  const codeString = String(children).replace(/\n$/, '');
-  // Touch lock logic for horizontal scroll
+  const language = (className ?? '').replace('language-', '').toLowerCase();
+  const codeString = String(children ?? '').replace(/\n$/, '');
+
+  // Horizontal scroll → lock sidebar swipe
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-
-    let startX = 0;
-    let startY = 0;
-    let isScrolling = false;
-
-    const onTouchStart = (e: TouchEvent) => {
+    let startX = 0, startY = 0, locked = false;
+    const onStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      isScrolling = false;
+      startX = e.touches[0].clientX; startY = e.touches[0].clientY; locked = false;
     };
-
-    const onTouchMove = (e: TouchEvent) => {
+    const onMove = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
       const dx = Math.abs(e.touches[0].clientX - startX);
       const dy = Math.abs(e.touches[0].clientY - startY);
-      if (!isScrolling && dx > 10 && dx > dy && el.scrollWidth > el.clientWidth) {
-        isScrolling = true;
-        window.__sidebarGestureLock = true;
+      if (!locked && dx > 10 && dx > dy && el.scrollWidth > el.clientWidth) {
+        locked = true; window.__sidebarGestureLock = true;
       }
     };
-
-    const onTouchEnd = () => {
-      setTimeout(() => { window.__sidebarGestureLock = false; }, 80);
-    };
-
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove', onTouchMove, { passive: true });
-    el.addEventListener('touchend', onTouchEnd, { passive: true });
-
+    const onEnd = () => setTimeout(() => { window.__sidebarGestureLock = false; }, 80);
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
     return () => {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
     };
   }, []);
 
-  if (className === 'language-chart') return <EnhancedChart dataStr={codeString} />;
-  if (language === 'mermaid') return <MermaidBlock code={codeString} />;
+  // Route special languages to their own renderers
+  if (language === 'chart')    return <EnhancedChart dataStr={codeString} />;
+  if (language === 'mermaid')  return <MermaidBlock code={codeString} />;
   if (language === 'products') return <ProductGrid dataStr={codeString} />;
 
   const handleCopy = () => {
@@ -372,81 +354,164 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   };
 
   const handleDownload = () => {
-    const extMap: Record<string, string> = {
-      javascript: 'js', typescript: 'ts', python: 'py', java: 'java',
-      cpp: 'cpp', c: 'c', csharp: 'cs', go: 'go', rust: 'rs',
-      ruby: 'rb', php: 'php', swift: 'swift', kotlin: 'kt',
-      html: 'html', css: 'css', scss: 'scss', sql: 'sql',
-      json: 'json', yaml: 'yml', xml: 'xml', markdown: 'md',
-      bash: 'sh', shell: 'sh', powershell: 'ps1', csv: 'csv',
-      toml: 'toml', ini: 'ini', dockerfile: 'Dockerfile',
-    };
-    const mimeMap: Record<string, string> = {
-      csv: 'text/csv', json: 'application/json', html: 'text/html',
-      xml: 'application/xml', sql: 'application/sql', markdown: 'text/markdown',
-    };
-    const nameMap: Record<string, string> = {
-      csv: 'data', json: 'data', html: 'document', sql: 'query',
-      markdown: 'document', xml: 'data',
-    };
-    const ext = extMap[language] || language || 'txt';
-    const mime = mimeMap[language] || 'text/plain';
-    const baseName = nameMap[language] || 'code';
-    const blob = new Blob([codeString], { type: mime });
-    downloadFile(blob, `${baseName}.${ext}`);
+    const ext  = EXT_MAP[language]  || language || 'txt';
+    const mime = MIME_MAP[language] || 'text/plain';
+    downloadFile(new Blob([codeString], { type: mime }), `file.${ext}`);
   };
 
-  // Memoize syntax highlighting — only recompute when code content changes
-  const highlightedHtml = useMemo(() => {
+  // Syntax highlight — skip on large files or weak devices
+  const highlighted = useMemo(() => {
     if (!codeString) return '';
-
-    if (codeString.length > 20000) {
-      return codeString.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-    // Device-aware: skip highlight.js on weak CPUs
-    if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) {
-      return codeString.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
+    if (codeString.length > 20_000) return escapeHtml(codeString);
+    if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency <= 2) return escapeHtml(codeString);
     try {
       if (language && hljs.getLanguage(language)) {
-        return hljs.highlight(codeString, {
-          language,
-          ignoreIllegals: true
-        }).value;
+        return hljs.highlight(codeString, { language, ignoreIllegals: true }).value;
       }
       return hljs.highlightAuto(codeString).value;
     } catch {
-      return codeString.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return escapeHtml(codeString);
     }
   }, [codeString, language]);
 
   return (
-    <div ref={containerRef} className="relative group/code my-6 border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--code-bg)] shadow-sm max-w-full transition-all hover:border-[var(--text-secondary)]/20">
-      {/* New Chat background logo */}
-      {(!codeString && !language) && (
-        <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',zIndex:0,opacity:0.12}}>
-          <img src={NexusLogo} alt="Nexus Logo" style={{width:96,height:96,filter:'drop-shadow(0 2px 12px #16A34A66)'}} />
-        </div>
-      )}
-      <div className="flex items-center justify-between px-4 py-2 bg-[var(--code-header)] border-b border-[var(--border)]">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] opacity-50">{language || 'SOURCE'}</span>
-        <div className="flex items-center gap-3">
-          <button onClick={handleDownload} className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all">
-            <Icons.Download className="w-3 h-3" />
+    <div ref={containerRef} className="nx-code-block">
+      <div className="nx-code-header">
+        <span className="nx-code-lang">{language || 'code'}</span>
+        <div className="nx-code-actions">
+          <button onClick={handleDownload} className="nx-code-btn">
+            <Icons.Download className="icon-12" />
             Download
           </button>
-          <button onClick={handleCopy} className={`flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider transition-all ${copied ? 'text-emerald-500' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
-            {copied ? <Icons.Check className="w-3 h-3" /> : <Icons.Copy className="w-3 h-3" />}
+          <button onClick={handleCopy} className={`nx-code-btn${copied ? ' copied' : ''}`}>
+            {copied
+              ? <Icons.Check className="icon-12" />
+              : <Icons.Copy className="icon-12" />}
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
       </div>
-      <pre className="overflow-x-auto custom-scrollbar leading-relaxed"><code ref={codeRef} className={`hljs ${className || ''} block p-5 w-fit min-w-full text-[0.875rem] sm:text-[0.875rem]`} dangerouslySetInnerHTML={{ __html: highlightedHtml }} /></pre>
+      <pre>
+        <code
+          className={`hljs${className ? ` ${className}` : ''}`}
+          dangerouslySetInnerHTML={{ __html: highlighted }}
+        />
+      </pre>
     </div>
   );
 });
 
-// ── Memoized message component — prevents re-rendering unchanged messages during streaming ──
+const escapeHtml = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// ── Table with copy-data button ───────────────────────────────────
+const EnhancedTable = ({ children }: any) => {
+  const [copied, setCopied] = useState(false);
+  const tableRef = useRef<HTMLTableElement>(null);
+
+  const handleCopy = () => {
+    if (!tableRef.current) return;
+    const rows = Array.from(tableRef.current.querySelectorAll('tr')) as HTMLTableRowElement[];
+    const tsv = rows
+      .map(r => Array.from(r.querySelectorAll('th,td') as NodeListOf<HTMLElement>)
+        .map(c => c.innerText.trim()).join('\t'))
+      .join('\n');
+    copyToClipboard(tsv);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="nx-table-wrapper">
+      <button onClick={handleCopy} className="nx-table-copy-btn">
+        {copied
+          ? <Icons.Check className="icon-11" />
+          : <Icons.Copy className="icon-11" />}
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+      <div className="nx-table-scroll">
+        <table ref={tableRef}>{children}</table>
+      </div>
+    </div>
+  );
+};
+
+// ── Inline code style (shared) ────────────────────────────────────
+const inlineCodeStyle: React.CSSProperties = {
+  fontFamily: "'JetBrains Mono', 'Fira Code', ui-monospace, monospace",
+  fontSize: '0.875em',
+  fontWeight: 500,
+  padding: '0.15em 0.45em',
+  borderRadius: 6,
+  background: 'color-mix(in srgb, var(--accent, #10a37f) 10%, var(--bg-tertiary, #2a2a2e))',
+  color: 'var(--accent, #10a37f)',
+  border: '1px solid color-mix(in srgb, var(--accent, #10a37f) 20%, transparent)',
+  whiteSpace: 'nowrap' as const,
+};
+
+// ── Markdown component map — stable, never recreated ──────────────
+// NOTE: In ReactMarkdown v8 / remark-gfm, the `inline` prop was removed.
+// We detect inline code by checking whether `node.tagName` is 'code'
+// and whether its parent is NOT a 'pre'. We use the `className` absence
+// as the primary signal since fenced blocks always get a language className.
+const buildMarkdownComponents = () => ({
+  table: EnhancedTable,
+
+  // Paragraph: use <div> to avoid React hydration errors when block-level
+  // elements (code blocks, tables) appear inside prose paragraphs.
+  p: ({ children }: any) => (
+    <div style={{ marginTop: 0, marginBottom: '0.9em', lineHeight: 1.75 }}>
+      {children}
+    </div>
+  ),
+
+  // Headings — keep consistent weight and spacing
+  h1: ({ children }: any) => <h2 style={{ fontSize: '1.4em', fontWeight: 700, margin: '1.5em 0 0.5em', lineHeight: 1.3, letterSpacing: '-0.01em' }}>{children}</h2>,
+  h2: ({ children }: any) => <h2 style={{ fontSize: '1.2em', fontWeight: 600, margin: '1.4em 0 0.5em', lineHeight: 1.3, letterSpacing: '-0.01em' }}>{children}</h2>,
+  h3: ({ children }: any) => <h3 style={{ fontSize: '1.05em', fontWeight: 600, margin: '1.2em 0 0.4em', lineHeight: 1.35 }}>{children}</h3>,
+  h4: ({ children }: any) => <h4 style={{ fontSize: '1em', fontWeight: 600, margin: '1em 0 0.35em', lineHeight: 1.4 }}>{children}</h4>,
+
+  // Lists — consistent spacing
+  ul: ({ children }: any) => <ul style={{ margin: '0.25em 0 0.9em', paddingLeft: '1.6em', listStyleType: 'disc' }}>{children}</ul>,
+  ol: ({ children }: any) => <ol style={{ margin: '0.25em 0 0.9em', paddingLeft: '1.6em', listStyleType: 'decimal' }}>{children}</ol>,
+  li: ({ children }: any) => <li style={{ marginBottom: '0.3em', lineHeight: 1.7 }}>{children}</li>,
+
+  // Blockquote
+  blockquote: ({ children }: any) => (
+    <blockquote style={{
+      margin: '0.9em 0',
+      paddingLeft: '1rem',
+      borderLeft: '3px solid var(--accent, #10a37f)',
+      color: 'var(--text-secondary)',
+      fontStyle: 'normal',
+    }}>
+      {children}
+    </blockquote>
+  ),
+
+  // Strong / em
+  strong: ({ children }: any) => <strong style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{children}</strong>,
+
+  // Code: detect fenced blocks by the presence of a language className.
+  // Inline code has no className (or className is empty / undefined).
+  code: ({ className, children, node }: any) => {
+    const isBlock = Boolean(className) || String(children ?? '').includes('\n');
+    if (isBlock) {
+      return <CodeBlock className={className}>{children}</CodeBlock>;
+    }
+    // Inline code
+    return <code style={inlineCodeStyle}>{children}</code>;
+  },
+
+  // Horizontal rule
+  hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1.5em 0' }} />,
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// MESSAGE ITEM
+// Memoized — only re-renders when its own data changes.
+// ═══════════════════════════════════════════════════════════════════
+
 interface MessageItemProps {
   msg: Message;
   isLast: boolean;
@@ -455,221 +520,265 @@ interface MessageItemProps {
   editingId: string | null;
   editContent: string;
   speakingMsgId: string | null;
-  onCopyText: (text: string, id: string) => void;
+  confidence?: ConfidenceSignal;
+  onCopy: (text: string, id: string) => void;
   onStartEdit: (id: string, content: string) => void;
   onCancelEdit: () => void;
   onSubmitEdit: (id: string) => void;
-  onEditContentChange: (val: string) => void;
+  onEditChange: (val: string) => void;
   onRegenerate: (id: string) => void;
   onFeedback: (id: string, fb: 'good' | 'bad' | null) => void;
   onSpeak: (id: string, text: string) => void;
   onSuggestionClick?: (text: string) => void;
-  markdownComponents: any;
-  remarkPlugins: any;
+  mdComponents: any;
+  remarkPlugins: any[];
 }
 
-const MessageItem = memo(({ msg, isLast, isLoading, copiedId, editingId, editContent, speakingMsgId, onCopyText, onStartEdit, onCancelEdit, onSubmitEdit, onEditContentChange, onRegenerate, onFeedback, onSpeak, onSuggestionClick, markdownComponents, remarkPlugins }: MessageItemProps) => {
-  return (
-    <div className={`group flex flex-col gap-3 animate-in fade-in duration-600 ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-full`}>
-      <div className="relative max-w-full sm:max-w-[92%] w-auto min-w-0">
-        <div className={`p-6 sm:p-7 rounded-2xl border transition-all ${msg.role === 'user' ? 'bg-[var(--bg-tertiary)]/30 border-[var(--border)] text-[var(--text-primary)] shadow-sm' : 'bg-transparent border-transparent text-[var(--text-primary)]'} overflow-hidden`}>
-          {msg.documents && msg.documents.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {msg.documents.map((doc, di) => {
-                const ext = doc.title.split('.').pop()?.toLowerCase() || '';
-                const isZip = ext === 'zip';
-                const fileInfo: Record<string, { color: string; label: string; icon: string }> = {
-                  pdf: { color: 'text-red-400 bg-red-500/10 border-red-500/20', label: 'PDF', icon: '📄' },
-                  docx: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'DOC', icon: '📝' },
-                  doc: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'DOC', icon: '📝' },
-                  xlsx: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'XLS', icon: '📊' },
-                  xls: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'XLS', icon: '📊' },
-                  csv: { color: 'text-green-400 bg-green-500/10 border-green-500/20', label: 'CSV', icon: '📊' },
-                  zip: { color: 'text-orange-400 bg-orange-500/10 border-orange-500/20', label: 'ZIP', icon: '📦' },
-                  json: { color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', label: 'JSON', icon: '{ }' },
-                  md: { color: 'text-purple-400 bg-purple-500/10 border-purple-500/20', label: 'MD', icon: '📑' },
-                };
-                const info = fileInfo[ext] || { color: 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border-[var(--border)]', label: 'TXT', icon: '📄' };
-                const zipFileCount = isZip ? (doc.content.match(/--- File: /g)?.length || 0) : 0;
-                return (
-                  <div key={di} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${info.color} min-w-[120px] max-w-[220px]`}>
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${info.color}`}>
-                      <span className="text-xs">{info.icon}</span>
+const MessageItem = memo(
+  ({
+    msg, isLast, isLoading, copiedId, editingId, editContent, speakingMsgId,
+    confidence,
+    onCopy, onStartEdit, onCancelEdit, onSubmitEdit, onEditChange,
+    onRegenerate, onFeedback, onSpeak, onSuggestionClick,
+    mdComponents, remarkPlugins,
+  }: MessageItemProps) => {
+    const isUser      = msg.role === 'user';
+    const isEditing   = editingId === msg.id;
+    const isCopied    = copiedId === msg.id;
+    const isSpeaking  = speakingMsgId === msg.id;
+    const isStreaming = isLoading && isLast && !isUser;
+
+    // Document file type metadata
+    const DOC_META: Record<string, { color: string; bg: string; icon: string; label: string }> = {
+      pdf:  { color: '#f87171', bg: 'rgba(248,113,113,0.08)', icon: '📄', label: 'PDF' },
+      docx: { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  icon: '📝', label: 'DOC' },
+      doc:  { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  icon: '📝', label: 'DOC' },
+      xlsx: { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'XLS' },
+      xls:  { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'XLS' },
+      csv:  { color: '#34d399', bg: 'rgba(52,211,153,0.08)',  icon: '📊', label: 'CSV' },
+      json: { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  icon: '{ }', label: 'JSON' },
+      zip:  { color: '#fb923c', bg: 'rgba(251,146,60,0.08)',  icon: '📦', label: 'ZIP' },
+      md:   { color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', icon: '📑', label: 'MD' },
+    };
+
+    return (
+      <div className={`message-group message-enter ${isUser ? 'message-user' : 'message-assistant'}`}>
+
+        {/* ── User bubble ─────────────────────────────────────────── */}
+        {isUser && (
+          <div>
+            {/* Attached documents */}
+            {msg.documents && msg.documents.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10, justifyContent: 'flex-end' }}>
+                {msg.documents.map((doc, i) => {
+                  const ext = doc.title.split('.').pop()?.toLowerCase() || '';
+                  const meta = DOC_META[ext] || { color: 'var(--text-secondary)', bg: 'var(--bg-tertiary)', icon: '📄', label: 'FILE' };
+                  return (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
+                      borderRadius: 10, border: `1px solid ${meta.color}30`,
+                      background: meta.bg, maxWidth: 200,
+                    }}>
+                      <div style={{
+                        width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: 6, background: meta.bg, fontSize: 12, flexShrink: 0,
+                      }}>{meta.icon}</div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', opacity: 0.7 }}>{meta.label}</div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-[var(--text-primary)] truncate">{doc.title}</p>
-                      <p className="text-[11px] text-[var(--text-secondary)]">{isZip ? `${zipFileCount} file${zipFileCount !== 1 ? 's' : ''}` : `${info.label} file`}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {isLoading && msg.role === 'assistant' && !msg.content ? (
-            <div className="flex items-center gap-3 py-4">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse" />
-                <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-75" />
-                <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-150" />
+                  );
+                })}
               </div>
-              <span className="text-[13px] sm:text-sm font-medium text-[var(--text-secondary)] animate-pulse">Thinking...</span>
-            </div>
-          ) : editingId === msg.id ? (
-            <div className="space-y-4">
-              <textarea value={editContent} onChange={(e) => onEditContentChange(e.target.value)} aria-label="Edit message content" placeholder="Edit your message..." className="w-full bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl p-5 text-[15px] sm:text-base focus:outline-none focus:border-[var(--accent)] transition-all leading-relaxed text-[var(--text-primary)] shadow-inner" rows={3} />
-              <div className="flex gap-2"><button onClick={() => onSubmitEdit(msg.id)} className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-xl text-[13px] sm:text-sm font-semibold active:scale-95 transition-all shadow-lg shadow-[var(--accent)]/10">Update</button><button onClick={onCancelEdit} className="px-5 py-2.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] rounded-xl text-[13px] sm:text-sm font-semibold border border-[var(--border)] active:scale-95 transition-all">Cancel</button></div>
-            </div>
-          ) : (
-            <div className="markdown-body"><ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>{typeof msg.content === 'string' ? msg.content : (msg.content ? String(msg.content) : '')}</ReactMarkdown></div>
-          )}
-          {msg.image && <div className="mt-8 rounded-xl overflow-hidden border border-[var(--border)] shadow-xl"><img src={`data:${msg.image.mimeType};base64,${msg.image.inlineData.data}`} alt="Context Attached" className="max-w-full h-auto" /></div>}
-          {msg.groundingChunks && msg.groundingChunks.length > 0 && (
-            <div className="mt-10 pt-6 border-t border-[var(--border)] animate-in fade-in duration-700">
-              <div className="flex items-center gap-2 mb-4">
-                 <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
+            )}
+
+            {isEditing ? (
+              <div style={{ width: '100%', maxWidth: 620 }}>
+                <textarea
+                  className="edit-textarea"
+                  value={editContent}
+                  onChange={e => onEditChange(e.target.value)}
+                  rows={3}
+                  autoFocus
+                />
+                <div className="edit-actions">
+                  <button className="edit-btn-primary" onClick={() => onSubmitEdit(msg.id)}>Update</button>
+                  <button className="edit-btn-cancel" onClick={onCancelEdit}>Cancel</button>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+            ) : (
+              <div className="message-user-bubble">{msg.content}</div>
+            )}
+
+            {/* Attached image */}
+            {msg.image && (
+              <img
+                src={`data:${msg.image.mimeType};base64,${msg.image.inlineData.data}`}
+                alt="Attached"
+                style={{ marginTop: 10, maxWidth: '100%', borderRadius: 12, border: '1px solid var(--border)' }}
+              />
+            )}
+
+            {/* User message action row */}
+            {!isEditing && (
+              <div className="message-actions" style={{ justifyContent: 'flex-end', paddingRight: 4 }}>
+                <button className={`message-action-btn${isCopied ? ' active-copy' : ''}`} onClick={() => onCopy(msg.content, msg.id)} title="Copy">
+                  {isCopied ? <Icons.Check className="icon-14" /> : <Icons.Copy className="icon-14" />}
+                </button>
+                <button className="message-action-btn" onClick={() => onStartEdit(msg.id, msg.content)} title="Edit">
+                  <Icons.Edit className="icon-14" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Assistant message ────────────────────────────────────── */}
+        {!isUser && (
+          <div className="message-assistant-body">
+            {/* Thinking/loading indicator */}
+            {isStreaming && !msg.content && (
+              <div className="typing-dots">
+                <div className="typing-dot" />
+                <div className="typing-dot" />
+                <div className="typing-dot" />
+              </div>
+            )}
+
+            {/* Markdown body */}
+            {msg.content && (
+              <div className="markdown-body">
+                <ReactMarkdown remarkPlugins={remarkPlugins} components={mdComponents}>
+                  {typeof msg.content === 'string' ? msg.content : String(msg.content ?? '')}
+                </ReactMarkdown>
+              </div>
+            )}
+
+            {/* Confidence signal — rendered after content settles, not during streaming */}
+            {msg.content && !isStreaming && confidence && (
+              <div style={{ marginTop: 12, marginBottom: 2 }}>
+                <ConfidenceBadge confidence={confidence} />
+              </div>
+            )}
+
+            {/* Grounding sources */}
+            {msg.groundingChunks && msg.groundingChunks.length > 0 && (
+              <div className="sources-strip">
                 {msg.groundingChunks.map((chunk: GroundingChunk, i: number) => {
-                  const uri = chunk.web?.uri || chunk.maps?.uri;
+                  const uri   = chunk.web?.uri || chunk.maps?.uri;
                   const title = chunk.web?.title || chunk.maps?.title;
                   if (!uri) return null;
                   return (
-                    <a key={i} href={uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]/40 border border-[var(--border)] hover:border-[var(--accent)]/50 transition-all group shadow-sm active:scale-[0.98]">
-                      <span className="text-[12px] sm:text-[13px] font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] truncate max-w-[180px]">{title || "Source"}</span>
-                      <Icons.PanelLeftOpen className="w-2 h-2 opacity-30 group-hover:opacity-100 rotate-180 transition-opacity" />
+                    <a key={i} href={uri} target="_blank" rel="noopener noreferrer" className="source-chip">
+                      <span>{title || 'Source'}</span>
                     </a>
                   );
                 })}
               </div>
+            )}
+
+            {/* Action toolbar */}
+            <div className="message-actions" style={{ paddingLeft: 2 }}>
+              <button className={`message-action-btn${isCopied ? ' active-copy' : ''}`} onClick={() => onCopy(msg.content, msg.id)} title="Copy">
+                {isCopied ? <Icons.Check className="icon-14" /> : <Icons.Copy className="icon-14" />}
+              </button>
+              <button className="message-action-btn" onClick={() => onRegenerate(msg.id)} title="Regenerate">
+                <Icons.RotateCcw className="icon-14" />
+              </button>
+              <button
+                className={`message-action-btn${isSpeaking ? ' active-speak' : ''}`}
+                onClick={() => onSpeak(msg.id, msg.content)}
+                title={isSpeaking ? 'Stop' : 'Read aloud'}
+              >
+                {isSpeaking
+                  ? <Icons.VolumeX className="icon-14" />
+                  : <Icons.Volume2 className="icon-14" />}
+              </button>
+              <div className="message-action-divider" />
+              <button
+                className={`message-action-btn${msg.feedback === 'good' ? ' active-good' : ''}`}
+                onClick={() => onFeedback(msg.id, msg.feedback === 'good' ? null : 'good')}
+                title="Good response"
+              >
+                <Icons.ThumbsUp className="icon-14" />
+              </button>
+              <button
+                className={`message-action-btn${msg.feedback === 'bad' ? ' active-bad' : ''}`}
+                onClick={() => onFeedback(msg.id, msg.feedback === 'bad' ? null : 'bad')}
+                title="Bad response"
+              >
+                <Icons.ThumbsDown className="icon-14" />
+              </button>
             </div>
-          )}
-        </div>
-        <div className={`mt-2 flex items-center gap-1 ${msg.role === 'assistant' ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity ${msg.role === 'user' ? 'justify-end pr-2' : 'pl-2'}`}>
-          <button onClick={() => onCopyText(msg.content, msg.id)} aria-label="Copy message" data-nexus-tooltip={copiedId === msg.id ? 'Copied' : 'Copy'} className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all">{copiedId === msg.id ? <Icons.Check className="w-3.5 h-3.5 text-[var(--accent)]" /> : <Icons.Copy className="w-3.5 h-3.5" />}</button>
-          {msg.role === 'user' && <button onClick={() => onStartEdit(msg.id, msg.content)} aria-label="Edit message" data-nexus-tooltip="Edit" className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all"><Icons.Edit className="w-3.5 h-3.5" /></button>}
-          {msg.role === 'assistant' && (
-            <>
-              <button onClick={() => onRegenerate(msg.id)} aria-label="Regenerate response" data-nexus-tooltip="Retry" className="p-2 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-all"><Icons.RotateCcw className="w-3.5 h-3.5" /></button>
-              <button 
-                onClick={() => onSpeak(msg.id, msg.content)} 
-                aria-label={speakingMsgId === msg.id ? "Stop speaking" : "Read aloud"} 
-                data-nexus-tooltip={speakingMsgId === msg.id ? "Stop" : "Read aloud"} 
-                className={`p-2 rounded-xl transition-all ${
-                  speakingMsgId === msg.id 
-                    ? 'text-[var(--accent)] bg-[var(--accent)]/10 animate-pulse' 
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {speakingMsgId === msg.id ? <Icons.VolumeX className="w-3.5 h-3.5" /> : <Icons.Volume2 className="w-3.5 h-3.5" />}
-              </button>
-              <div className="w-px h-4 bg-[var(--border)] mx-0.5" />
-              <button 
-                onClick={() => onFeedback(msg.id, msg.feedback === 'good' ? null : 'good')} 
-                aria-label="Good response" 
-                data-nexus-tooltip="Good response" 
-                className={`p-2 rounded-xl transition-all ${
-                  msg.feedback === 'good' 
-                    ? 'text-[var(--accent)] bg-[var(--accent)]/10' 
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Icons.ThumbsUp className="w-3.5 h-3.5" />
-              </button>
-              <button 
-                onClick={() => onFeedback(msg.id, msg.feedback === 'bad' ? null : 'bad')} 
-                aria-label="Bad response" 
-                data-nexus-tooltip="Bad response" 
-                className={`p-2 rounded-xl transition-all ${
-                  msg.feedback === 'bad' 
-                    ? 'text-red-400 bg-red-500/10' 
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Icons.ThumbsDown className="w-3.5 h-3.5" />
-              </button>
-            </>
-          )}
-        </div>
-        {isLast && msg.role === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && !isLoading && (
-          <div className="mt-8 flex flex-col gap-3 items-start animate-in fade-in slide-in-from-bottom-2 duration-700">
-            <div className="flex flex-wrap gap-2">{msg.suggestions.map((suggestion, i) => (<button key={i} onClick={() => onSuggestionClick?.(suggestion)} className="px-4 py-2.5 rounded-xl bg-[var(--bg-tertiary)]/20 border border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all text-[13px] sm:text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] text-left active:scale-[0.97] shadow-sm">{suggestion}</button>))}</div>
+
+            {/* Follow-up suggestion chips */}
+            {isLast && !isLoading && msg.suggestions && msg.suggestions.length > 0 && (
+              <div className="suggestion-chips">
+                {msg.suggestions.map((s, i) => (
+                  <button key={i} className="suggestion-chip" onClick={() => onSuggestionClick?.(s)}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
-    </div>
-  );
-}, (prev, next) => {
-  // Custom equality — only re-render when THIS message's data actually changes
-  if (prev.msg.content !== next.msg.content) return false;
-  if (prev.msg.feedback !== next.msg.feedback) return false;
-  if (prev.msg.suggestions !== next.msg.suggestions) return false;
-  if (prev.isLast !== next.isLast) return false;
-  if (prev.isLoading !== next.isLoading) return false;
-  if ((prev.copiedId === prev.msg.id) !== (next.copiedId === next.msg.id)) return false;
-  if ((prev.editingId === prev.msg.id) !== (next.editingId === next.msg.id)) return false;
-  if (prev.editingId === prev.msg.id && prev.editContent !== next.editContent) return false;
-  if ((prev.speakingMsgId === prev.msg.id) !== (next.speakingMsgId === next.msg.id)) return false;
-  return true;
-});
+    );
+  },
+  (prev, next) => {
+    if (prev.msg.content    !== next.msg.content)    return false;
+    if (prev.msg.feedback   !== next.msg.feedback)   return false;
+    if (prev.msg.suggestions !== next.msg.suggestions) return false;
+    if (prev.isLast     !== next.isLast)     return false;
+    if (prev.isLoading  !== next.isLoading)  return false;
+    if (prev.confidence?.level !== next.confidence?.level) return false;
+    if ((prev.copiedId   === prev.msg.id) !== (next.copiedId   === next.msg.id)) return false;
+    if ((prev.editingId  === prev.msg.id) !== (next.editingId  === next.msg.id)) return false;
+    if (prev.editingId === prev.msg.id && prev.editContent !== next.editContent) return false;
+    if ((prev.speakingMsgId === prev.msg.id) !== (next.speakingMsgId === next.msg.id)) return false;
+    return true;
+  }
+);
 
-const ChatArea: React.FC<ChatAreaProps> = ({ 
-  session, 
-  isLoading, 
-  onExport, 
-  onToggleSidebar,
-  isSidebarOpen,
-  onRegenerate,
-  onEditMessage,
-  onFeedback,
-  theme,
-  onThemeToggle,
-  onSuggestionClick
+// ═══════════════════════════════════════════════════════════════════
+// CHAT AREA (ROOT)
+// ═══════════════════════════════════════════════════════════════════
+
+const ChatArea: React.FC<ChatAreaProps> = ({
+  session, isLoading, onExport, onToggleSidebar, isSidebarOpen,
+  onRegenerate, onEditMessage, onFeedback, theme, onThemeToggle, onSuggestionClick,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const messages = session?.messages || [];
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState("");
-  const [autoScroll, setAutoScroll] = useState(true);
-  const [showScrollDown, setShowScrollDown] = useState(false);
+  const messages  = session?.messages ?? [];
+
+  const [copiedId,     setCopiedId]     = useState<string | null>(null);
+  const [editingId,    setEditingId]    = useState<string | null>(null);
+  const [editContent,  setEditContent]  = useState('');
+  const [autoScroll,   setAutoScroll]   = useState(true);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const scrollRafRef = useRef<number>(0);
-  const autoScrollRafRef = useRef<number>(0);
 
-  // Strip markdown for clean TTS speech
-  const stripMarkdown = useCallback((text: string): string => {
-    return text
-      .replace(/```[\s\S]*?```/g, '. code block omitted. ')
-      .replace(/`([^`]+)`/g, '$1')
-      .replace(/#{1,6}\s/g, '')
-      .replace(/\*\*([^*]+)\*\*/g, '$1')
-      .replace(/\*([^*]+)\*/g, '$1')
-      .replace(/~~([^~]+)~~/g, '$1')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
-      .replace(/^\s*[-*+]\s/gm, '')
-      .replace(/^\s*\d+\.\s/gm, '')
-      .replace(/^\s*>\s/gm, '')
-      .replace(/---/g, '')
-      .replace(/\|[^\n]+\|/g, '')
-      .replace(/\n{2,}/g, '. ')
-      .replace(/\n/g, ' ')
-      .trim();
-  }, []);
-  // Handle scroll to manage auto-scroll and showScrollDown
+  // ── Scroll management ──────────────────────────────────────────
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-
-    const isNearBottom =
-      el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-
-    setAutoScroll(isNearBottom);
-    setShowScrollDown(!isNearBottom);
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setAutoScroll(nearBottom);
+    setShowScrollBtn(!nearBottom);
   }, []);
 
-  // TTS: speak or stop a message
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, []);
+
+  useEffect(() => {
+    if (autoScroll) scrollToBottom();
+  }, [messages, isLoading, autoScroll, scrollToBottom]);
+
+  // ── TTS ────────────────────────────────────────────────────────
   const speakMessage = useCallback((msgId: string, text: string) => {
     const synth = window.speechSynthesis;
     try {
@@ -679,157 +788,101 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         utteranceRef.current = null;
         return;
       }
-      synth.cancel(); // Always cancel before starting new utterance
+      synth.cancel();
       const cleaned = stripMarkdown(text);
       if (!cleaned) return;
 
       const doSpeak = () => {
-        const utterance = new SpeechSynthesisUtterance(cleaned);
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        // Pick a good voice if available (prefer en-US, avoid novelty voices)
+        const u = new SpeechSynthesisUtterance(cleaned);
+        u.rate = 1.0; u.pitch = 1.0;
         const voices = synth.getVoices();
-        const preferred = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google'))
-          || voices.find(v => v.lang.startsWith('en-US') && !v.localService)
-          || voices.find(v => v.lang.startsWith('en'));
-        if (preferred) utterance.voice = preferred;
-        utterance.onend = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
-        utterance.onerror = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
-        utteranceRef.current = utterance;
+        const voice  =
+          voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) ||
+          voices.find(v => v.lang.startsWith('en-US') && !v.localService) ||
+          voices.find(v => v.lang.startsWith('en'));
+        if (voice) u.voice = voice;
+        u.onend  = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
+        u.onerror = () => { setSpeakingMsgId(null); utteranceRef.current = null; };
+        utteranceRef.current = u;
         setSpeakingMsgId(msgId);
-        // Chrome workaround: cancel + small delay before speaking
         synth.cancel();
-        setTimeout(() => synth.speak(utterance), 50);
+        setTimeout(() => synth.speak(u), 50);
       };
 
       if (synth.getVoices().length === 0) {
-        // Voices not loaded yet — wait for voiceschanged
-        let spoken = false;
-        const onVoicesChanged = () => {
-          synth.removeEventListener('voiceschanged', onVoicesChanged);
-          if (!spoken) { spoken = true; doSpeak(); }
-        };
-        synth.addEventListener('voiceschanged', onVoicesChanged);
-        // Fallback: if voiceschanged never fires (Firefox), try after 500ms anyway
-        setTimeout(() => {
-          synth.removeEventListener('voiceschanged', onVoicesChanged);
-          if (!spoken) { spoken = true; doSpeak(); }
-        }, 500);
+        let done = false;
+        const onVC = () => { synth.removeEventListener('voiceschanged', onVC); if (!done) { done = true; doSpeak(); } };
+        synth.addEventListener('voiceschanged', onVC);
+        setTimeout(() => { synth.removeEventListener('voiceschanged', onVC); if (!done) { done = true; doSpeak(); } }, 500);
       } else {
         doSpeak();
       }
-    } catch (err) {
+    } catch {
       setSpeakingMsgId(null);
       utteranceRef.current = null;
-      if (process.env.NODE_ENV === 'development') {
-        // eslint-disable-next-line no-console
-        console.error('Speech synthesis error:', err);
-      }
     }
-  }, [speakingMsgId, stripMarkdown]);
+  }, [speakingMsgId]);
 
-  // Cleanup TTS on session change or unmount
+  // Cleanup TTS on session change
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();
       setSpeakingMsgId(null);
-      if (scrollRafRef.current != null) {
-        cancelAnimationFrame(scrollRafRef.current);
-      }
-      if (autoScrollRafRef.current != null) {
-        cancelAnimationFrame(autoScrollRafRef.current);
-      }
     };
   }, [session?.id]);
 
-  useEffect(() => {
-    if (scrollRef.current && autoScroll) {
-      // Direct assignment: no animation, prevents layout bugs during streaming
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isLoading, autoScroll]);
-
-  const handleCopyText = useCallback((text: string, id: string) => {
+  // ── Message actions ────────────────────────────────────────────
+  const handleCopy = useCallback((text: string, id: string) => {
     copyToClipboard(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   }, []);
 
   const handleStartEdit = useCallback((id: string, content: string) => {
-    setEditingId(id);
-    setEditContent(content);
+    setEditingId(id); setEditContent(content);
   }, []);
 
-  const handleCancelEdit = useCallback(() => {
-    setEditingId(null);
-  }, []);
+  const handleCancelEdit = useCallback(() => setEditingId(null), []);
 
-  const submitEdit = useCallback((id: string) => {
+  const handleSubmitEdit = useCallback((id: string) => {
     if (editContent.trim()) {
       onEditMessage(id, editContent.trim());
       setEditingId(null);
     }
   }, [editContent, onEditMessage]);
 
-  const getModelDisplayName = (model?: AIModel) => {
-    if (!model) return "Nexus AI";
-    switch (model) {
-      case AIModel.GPT4: return "Reasoning & Planning";
-      case AIModel.CLAUDE: return "Coding & Writing";
-      case AIModel.GEMINI: return "Search & Speed";
-      default: return "Nexus AI";
-    }
-  };
+  // ── Stable markdown components (never recreated) ───────────────
+  const mdComponents = useMemo(() => buildMarkdownComponents(), []);
+  const remarkPlugins = useMemo(() => [remarkGfm], []);
 
-  // Stable memoized markdown components — prevents re-creation on every render
-  const markdownComponents = useMemo(() => ({
-    table: EnhancedTable,
-    p: ({ children }: any) => <div className="mb-4 leading-relaxed">{children}</div>,
-    code: ({ node, inline, className, children, ...props }: any) => {
-      // Always render fenced code blocks as block
-      if (!inline) return <CodeBlock className={className} children={children} />;
-
-      // Only render as inline if it's a single identifier (no spaces, no symbols, no newlines)
-      const text = String(children).trim();
-      const identifierPattern = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
-      if (identifierPattern.test(text)) {
-        return <code className={`${className || ''} inline-code text-[var(--accent)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-md text-[0.875em] font-semibold border border-[var(--border)]`} {...props}>{children}</code>;
-      }
-      // Otherwise, treat as block code
-      return <CodeBlock className={className} children={children} />;
-    }
-  }), []);
-
-  const remarkPluginsStable = useMemo(() => [remarkGfm], []);
-
+  // ── Render ─────────────────────────────────────────────────────
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-primary)] relative overflow-hidden">
-      {/* Remove dot and all top-right controls on mobile */}
-      <div className="fixed top-6 right-8 z-40 gap-2 bg-[var(--bg-primary)]/90 rounded-2xl shadow-xl border border-[var(--border)] px-3 py-2 backdrop-blur-md items-center hidden sm:flex">
-        <button
-          onClick={onThemeToggle}
-          aria-label="Toggle theme"
-          data-nexus-tooltip={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-          className="p-2.5 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-colors"
-        >
-          {theme === 'dark' ? <Icons.Sun className="w-4 h-4" /> : <Icons.Moon className="w-4 h-4" />}
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
+
+      {/* Top-right controls */}
+      <div className="chat-controls">
+        <button className="chat-ctrl-btn" onClick={onThemeToggle} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
+          {theme === 'dark' ? <Icons.Sun className="icon-16" /> : <Icons.Moon className="icon-16" />}
         </button>
-        <button
-          onClick={onExport}
-          aria-label="Export conversation"
-          data-nexus-tooltip="Export chat"
-          className="p-2.5 rounded-xl hover:bg-[var(--bg-tertiary)]/50 text-[var(--text-secondary)] transition-colors"
-        >
-          <Icons.Download className="w-4 h-4" />
+        <button className="chat-ctrl-btn" onClick={onExport} title="Export chat">
+          <Icons.Download className="icon-16" />
         </button>
       </div>
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-2 sm:px-0 py-8 sm:py-14 touch-action-pan-y overscroll-behavior-contain">
-        <div className="max-w-[900px] w-full mx-auto flex flex-col gap-12 pb-32">
+
+      {/* Message scroll area */}
+      <div ref={scrollRef} onScroll={handleScroll} className="chat-scroll">
+        <div className="chat-column">
+
+          {/* Empty state */}
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center pt-32 text-center animate-in fade-in duration-1000">
-               <div className="w-16 h-16 bg-[var(--accent)]/5 rounded-2xl flex items-center justify-center border border-[var(--accent)]/10"><Icons.Robot className="w-8 h-8 text-[var(--accent)] opacity-30" /></div>
+            <div className="chat-empty-state">
+              <div className="chat-empty-icon">
+                <Icons.Robot className="icon-24 icon-accent-robot" />
+              </div>
             </div>
           )}
+
+          {/* Messages */}
           {messages.map((msg, idx) => (
             <MessageItem
               key={msg.id}
@@ -840,40 +893,42 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               editingId={editingId}
               editContent={editContent}
               speakingMsgId={speakingMsgId}
-              onCopyText={handleCopyText}
+              confidence={(msg as any).confidence as ConfidenceSignal | undefined}
+              onCopy={handleCopy}
               onStartEdit={handleStartEdit}
               onCancelEdit={handleCancelEdit}
-              onSubmitEdit={submitEdit}
-              onEditContentChange={setEditContent}
+              onSubmitEdit={handleSubmitEdit}
+              onEditChange={setEditContent}
               onRegenerate={onRegenerate}
               onFeedback={onFeedback}
               onSpeak={speakMessage}
               onSuggestionClick={onSuggestionClick}
-              markdownComponents={markdownComponents}
-              remarkPlugins={remarkPluginsStable}
+              mdComponents={mdComponents}
+              remarkPlugins={remarkPlugins}
             />
           ))}
-          {isLoading && !messages.some(m => m.id.startsWith('assistant-')) && (
-            <div className="flex flex-col gap-4 items-start animate-in fade-in duration-500">
-              <div className="flex gap-2 p-5 rounded-2xl bg-[var(--bg-tertiary)]/20 border border-[var(--border)] shadow-inner"><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse" /><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-100" /><div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse delay-200" /></div>
+
+          {/* Global loading indicator (before first token) */}
+          {isLoading && !messages.some(m => m.role === 'assistant' && m.content) && (
+            <div className="typing-dots">
+              <div className="typing-dot" />
+              <div className="typing-dot" />
+              <div className="typing-dot" />
             </div>
           )}
         </div>
       </div>
-      {showScrollDown && (
-        <button
-          onClick={() => {
-            if (scrollRef.current) {
-              scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-            }
-          }}
-          aria-label="Scroll to latest message"
-          className="scroll-to-bottom-btn-center"
-        >
-          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 13l5 5 5-5M7 6l5 5 5-5" /></svg>
+
+      {/* Scroll-to-bottom button */}
+      {showScrollBtn && (
+        <button className="scroll-to-bottom-btn-center" onClick={scrollToBottom} aria-label="Scroll to latest">
+          <svg viewBox="0 0 24 24" style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M7 13l5 5 5-5M7 6l5 5 5-5" />
+          </svg>
         </button>
       )}
     </div>
   );
 };
+
 export default ChatArea;

@@ -91,7 +91,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [sessions, debouncedSearch]);
 
   // Style helpers for ChatGPT-like session titles and menu
-  const sessionTitleClass = "text-[1.08rem] font-semibold leading-tight truncate transition-colors group-hover:text-[var(--accent)]";
+  const sessionTitleClass = "text-xs sm:text-sm font-semibold leading-tight truncate transition-colors group-hover:text-[var(--accent)]";
   const menuHeadingClass = "text-[0.98rem] font-bold uppercase tracking-wide text-[var(--text-secondary)] mb-2 mt-4";
 
   const favorites = filteredSessions.filter(s => s.isFavorite);
@@ -154,7 +154,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             autoFocus
             aria-label="Edit chat session title"
             placeholder="Enter session title"
-            className="w-full bg-transparent border-none outline-none focus:ring-0 p-0 text-[var(--text-primary)] text-[13px] font-medium"
+            className="w-full bg-transparent border-none outline-none focus:ring-0 p-0 text-[var(--text-primary)] text-xs sm:text-sm font-medium"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={() => saveEdit(session.id)}
@@ -164,7 +164,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         ) : (
           <>
             <span className={`flex-1 truncate pr-[120px] font-medium ${isConfirming ? 'text-red-500 font-bold' : ''}`}>
-              {isConfirming ? 'Delete chat?' : (session.title || 'New Chat')}
+              <span className="text-xs sm:text-sm">{isConfirming ? 'Delete chat?' : (session.title || 'New Chat')}</span>
             </span>
             <div className={`absolute right-2 flex items-center gap-1 transition-opacity ${isActive || isConfirming ? 'opacity-100' : 'opacity-0 sm:group-hover:opacity-100'}`}>
               {isConfirming ? (

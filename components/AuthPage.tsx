@@ -96,7 +96,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   return (
     <>
       <BackArrow />
-      <div className="min-h-screen min-h-[100dvh] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans">
+      <div className="min-h-[100dvh] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans">
 
       {/* Full-page content */}
       <div className="w-full max-w-[400px] z-10 flex flex-col items-center">
@@ -104,7 +104,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center">
           <div className="mb-5 flex items-center justify-center">
-            <img src={NexusLogo} alt="Nexus Logo" style={{width:48,height:48,filter:'drop-shadow(0 2px 8px #16A34A33)'}} />
+            <img src={NexusLogo} alt="Nexus Logo" className="nexus-logo" />
           </div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
             {isForgotPassword ? 'Reset your password' : isLogin ? 'Welcome back' : 'Create your account'}

@@ -1,3 +1,9 @@
+/* Logo style for AuthPage */
+.nexus-logo {
+	width: 48px;
+	height: 48px;
+	filter: drop-shadow(0 2px 8px #16A34A33);
+}
 /* Custom modern scrollbar for all major browsers */
 .custom-scrollbar {
 	scrollbar-width: thin;

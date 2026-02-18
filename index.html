@@ -72,7 +72,8 @@
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;
-      overscroll-behavior: none;
+        /* overscroll-behavior: none is not supported on iOS < 16, but safe for modern browsers */
+        overscroll-behavior: none;
       height: 100vh;
       height: 100dvh;
       width: 100vw;
@@ -279,13 +280,17 @@
       background-color: var(--code-bg) !important;
       border: 1px solid var(--border);
       border-radius: 16px;
-      margin: 2rem 0;
+      min-width: -webkit-fill-available; /* Samsung Internet fallback */
+      min-width: fit-content;
       padding: 0 !important;
       overflow-x: auto;
       max-width: 100%;
       display: block;
       box-shadow: 0 10px 30px -10px rgba(0,0,0,0.15);
     }
+
+      /* meta[name=theme-color] is not supported by Firefox, Firefox for Android, Opera */
+      /* script[type=importmap] is not supported by Safari on iOS < 16.4 */
 
     .markdown-body code {
       font-family: 'JetBrains Mono', Menlo, Consolas, 'Courier New', monospace;
@@ -304,6 +309,7 @@
       white-space: pre;
       word-wrap: normal;
       display: block;
+      min-width: -webkit-fill-available; /* Samsung Internet fallback */
       min-width: fit-content;
       color: var(--text-primary);
     }
