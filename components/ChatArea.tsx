@@ -409,6 +409,13 @@ const EnhancedTable = ({ children }: any) => {
   const [copied, setCopied] = useState(false);
   const tableRef = useRef<HTMLTableElement>(null);
 
+  // Defensive: check if children are valid table rows/cells
+  const isValidTable = React.Children.toArray(children).some(
+    (child: any) => child && child.type && (
+      child.type === 'thead' || child.type === 'tbody' || child.type === 'tr'
+    )
+  );
+
   const handleCopy = () => {
     if (!tableRef.current) return;
     const rows = Array.from(tableRef.current.querySelectorAll('tr')) as HTMLTableRowElement[];
@@ -430,7 +437,11 @@ const EnhancedTable = ({ children }: any) => {
         {copied ? 'Copied' : 'Copy'}
       </button>
       <div className="nx-table-scroll">
-        <table ref={tableRef}>{children}</table>
+        {isValidTable ? (
+          <table ref={tableRef}>{children}</table>
+        ) : (
+          <div className="nx-table-warning">⚠️ Table markdown is malformed or incomplete. Please check your markdown syntax.</div>
+        )}
       </div>
     </div>
   );
