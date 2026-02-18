@@ -1,3 +1,10 @@
+/* Allow message containers to shrink for flex overflow fix */
+.message-assistant,
+.message-assistant-body,
+.message-group,
+.chat-column {
+  min-width: 0;
+}
 /* LandingPage logo and footer image styles */
 .landing-logo-img {
   width: 32px;
@@ -161,7 +168,8 @@
   overflow-wrap: break-word;
   hyphens: none;
   text-align: left;
-
+  min-width: 0;
+  max-width: 100%;
   /* Prevent orphaned inline code at block boundaries */
   & > *:first-child { margin-top: 0; }
   & > *:last-child  { margin-bottom: 0; }
@@ -298,23 +306,40 @@
 
 
 /* ═══════════════════════════════════════════════════════════════════
-   CODE BLOCKS — PREMIUM DEVELOPER EXPERIENCE
+   CODE BLOCKS — THE DEFINITIVE FIX
+   Header is COMPLETELY SEPARATE from the scrolling area
    ═══════════════════════════════════════════════════════════════════ */
 
-/* Code block wrapper */
+/* Wrapper - just a container */
 .nx-code-block {
   position: relative;
   margin: 1.25em 0;
   border: 1px solid var(--border);
   border-radius: var(--nx-radius-lg);
-  overflow: hidden;
   background: var(--code-bg, #0d0d0f);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
   transition: border-color var(--nx-transition-slow);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
-.nx-code-block:hover { border-color: color-mix(in srgb, var(--border) 100%, var(--text-secondary) 30%); }
 
-/* Code block header */
+/* Dedicated scroll container for code blocks */
+.nx-code-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1;
+}
+.nx-code-block:hover { 
+  border-color: color-mix(in srgb, var(--border) 100%, var(--text-secondary) 30%); 
+}
+
+/* Header - FIXED position, NEVER scrolls */
 .nx-code-header {
   display: flex;
   align-items: center;
@@ -323,7 +348,12 @@
   height: 38px;
   background: var(--code-header, rgba(255,255,255,0.03));
   border-bottom: 1px solid var(--border);
+  border-radius: var(--nx-radius-lg) var(--nx-radius-lg) 0 0;
   user-select: none;
+  /* CRITICAL: These properties keep it from scrolling */
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
 }
 
 .nx-code-lang {
@@ -340,6 +370,7 @@
   display: flex;
   align-items: center;
   gap: var(--nx-space-3);
+  flex-shrink: 0;
 }
 
 .nx-code-btn {
@@ -364,33 +395,38 @@
 }
 .nx-code-btn.copied { color: #10a37f; }
 
-/* Actual code scroll area */
+/* Pre element - this scrolls independently */
 .nx-code-block pre {
   margin: 0;
-  overflow-x: auto;
   padding: var(--nx-space-5);
-  -webkit-overflow-scrolling: touch;
-}
-.nx-code-block code {
-  display: block;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
-  font-size: 0.8125rem; /* 13px — comfortable reading for code */
-  line-height: 1.7;
-  color: #e2e8f0;
   white-space: pre;
-  tab-size: 2;
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
 }
 
-/* Custom scrollbar inside code blocks */
+.nx-code-block code {
+  display: inline-block;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  /* Allow code to be as wide as it needs */
+  white-space: pre;
+}
+
+/* Scrollbar styling */
 .nx-code-block pre::-webkit-scrollbar {
-  height: 4px;
+  height: 8px;
 }
 .nx-code-block pre::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255,255,255,0.03);
+  border-radius: 0 0 var(--nx-radius-lg) var(--nx-radius-lg);
 }
 .nx-code-block pre::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 2px;
+  border-radius: 4px;
 }
 .nx-code-block pre::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
@@ -399,10 +435,7 @@
 /* ── Ensure pre/code inside markdown never collides with prose ───── */
 .markdown-body pre {
   margin: 1.25em 0;
-  /* Handled by .nx-code-block — this just ensures native pre elements
-     don't escape their container */
   max-width: 100%;
-  overflow-x: auto;
 }
 .markdown-body pre:first-child { margin-top: 0; }
 .markdown-body pre:last-child  { margin-bottom: 0; }
@@ -860,19 +893,21 @@
 
 /* ── Product grid ────────────────────────────────────────────────── */
 .nx-product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--nx-space-3);
-  margin: 1.25em 0;
-}
-.nx-product-card {
   display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: var(--nx-radius-lg);
-  padding: var(--nx-space-4);
-  background: var(--bg-secondary);
-  text-decoration: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--nx-space-4);
+  height: 38px;
+  background: var(--code-header, rgba(255,255,255,0.03));
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--nx-radius-lg) var(--nx-radius-lg) 0 0;
+  user-select: none;
+  /* CRITICAL: These properties keep it from scrolling */
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  flex: 0 0 auto;
+  width: 100%;
   transition: border-color var(--nx-transition), transform var(--nx-transition), box-shadow var(--nx-transition);
 }
 .nx-product-card:hover {

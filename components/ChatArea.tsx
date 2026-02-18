@@ -391,12 +391,15 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
           </button>
         </div>
       </div>
-      <pre>
-        <code
-          className={`hljs${className ? ` ${className}` : ''}`}
-          dangerouslySetInnerHTML={{ __html: highlighted }}
-        />
-      </pre>
+      {/* Dedicated scroll container for code blocks */}
+      <div className="nx-code-scroll">
+        <pre>
+          <code
+            className={`hljs${className ? ` ${className}` : ''}`}
+            dangerouslySetInnerHTML={{ __html: highlighted }}
+          />
+        </pre>
+      </div>
     </div>
   );
 });
@@ -505,12 +508,15 @@ const buildMarkdownComponents = () => ({
 
   // Code: detect fenced blocks by the presence of a language className.
   // Inline code has no className (or className is empty / undefined).
-  code: ({ className, children, node }: any) => {
-    const isBlock = Boolean(className) || String(children ?? '').includes('\n');
-    if (isBlock) {
-      return <CodeBlock className={className}>{children}</CodeBlock>;
-    }
-    // Inline code
+  pre: ({ children }: any) => {
+    const codeEl = children?.props;
+    return (
+      <CodeBlock className={codeEl?.className}>
+        {codeEl?.children}
+      </CodeBlock>
+    );
+  },
+  code: ({ inline, children }: any) => {
     return <code style={inlineCodeStyle}>{children}</code>;
   },
 
