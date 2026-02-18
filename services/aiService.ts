@@ -592,6 +592,34 @@ function postProcess(raw: string): string {
     ""
   );
 
+  // ── Tag unlabeled opening fences only — never touch closing fences ──
+  // Root cause of the ```text bug: a regex can't distinguish opening from
+  // closing because both look identical (bare ``` on its own line).
+  // Fix: walk line-by-line with a state flag. Only an opening fence (seen
+  // while NOT inside a block) gets tagged. The closing fence is emitted as
+  // plain ``` every time, which is correct markdown.
+  t = (() => {
+    const lines = t.split("\n");
+    const out: string[] = [];
+    let inBlock = false;
+    for (const line of lines) {
+      const isBare   = /^```[ \t]*$/.test(line);   // ``` with no language tag
+      const isTagged = /^```\w/.test(line);         // ```mermaid, ```python, etc.
+      if (!inBlock && isBare) {
+        out.push("```text");   // opening fence: add language tag
+        inBlock = true;
+      } else if (!inBlock && isTagged) {
+        out.push(line);        // already-tagged opening fence: pass through
+        inBlock = true;
+      } else if (inBlock && isBare) {
+        out.push("```");       // closing fence: emit plain, never tag
+        inBlock = false;
+      } else {
+        out.push(line);        // regular line inside or outside a block
+      }
+    }
+    return out.join("\n");
+  })();
 
   // ── Collapse excessive blank lines ────────────────────────────────
   t = t.replace(/\n{4,}/g, "\n\n\n");
