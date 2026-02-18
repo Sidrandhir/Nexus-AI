@@ -250,6 +250,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <Icons.Robot className="w-5 h-5 text-white" />
                 </div>
                 <h1 className="text-[14px] font-black tracking-tight text-[var(--text-primary)] uppercase">NEXUS AI</h1>
+                {/* BEGIN: Beta Badge (remove this block to remove Beta label) */}
+                <span style={{ color: '#FFD600', fontWeight: 700, fontSize: '11px', marginLeft: 6, letterSpacing: '0.05em' }}>Beta</span>
+                {/* END: Beta Badge */}
               </div>
             )}
             <button 
