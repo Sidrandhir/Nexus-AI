@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Icons } from '../constants';
+import NexusLogo from '../public/nexus-logo-modern.svg';
+import { Link } from 'react-router-dom';
 import './LandingPage.css';
 
 type Props = {
@@ -124,7 +126,7 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       <nav className="navbar">
         <div className="nav-container">
           <div className="logo-section">
-            <div className="logo-icon"><Icons.Robot className="robot-icon" /></div>
+            <img src={NexusLogo} alt="Nexus Logo" className="logo-icon" style={{width:32, height:32, marginRight:8, filter:'drop-shadow(0 2px 8px #16A34A33)'}} />
             <div className="logo-text">
               <h1 className="logo-title">Nexus AI</h1>
               <p className="logo-subtitle">One input. Best output.</p>
@@ -373,14 +375,14 @@ const LandingPage: React.FC<Props> = ({ onOpenAuth }) => {
       <footer className="footer">
         <div className="footer-content">
           <div className="footer-brand">
-            <Icons.Robot className="footer-logo-icon" />
+            <img src={NexusLogo} alt="Nexus Logo" className="footer-logo-icon" style={{width:28, height:28, marginRight:8, filter:'drop-shadow(0 2px 8px #16A34A33)'}} />
             <span className="footer-logo-text">Nexus AI</span>
           </div>
           <p className="footer-copy">&copy; {new Date().getFullYear()} Nexus AI. All rights reserved.</p>
           <div className="footer-links">
-            <a href="#privacy">Privacy</a>
-            <a href="#terms">Terms</a>
-            <a href="#contact">Contact</a>
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Terms</Link>
+            <Link to="/contact">Contact</Link>
           </div>
         </div>
       </footer>

@@ -1,3 +1,32 @@
+/* Custom modern scrollbar for all major browsers */
+.custom-scrollbar {
+	scrollbar-width: thin;
+	scrollbar-color: var(--accent) var(--bg-secondary);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+	width: 10px;
+	background: var(--bg-secondary);
+	border-radius: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+	background: linear-gradient(135deg, var(--accent), var(--accent-gradient, #10b981));
+	border-radius: 8px;
+	min-height: 40px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: var(--accent);
+}
+.custom-scrollbar::-webkit-scrollbar-corner {
+	background: var(--bg-secondary);
+}
+
+/* Responsive text for static pages */
+.custom-scrollbar, .custom-scrollbar * {
+	font-size: clamp(0.98rem, 1.1vw, 1.15rem);
+	line-height: 1.7;
+	letter-spacing: 0.01em;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

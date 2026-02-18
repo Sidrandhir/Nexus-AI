@@ -11,6 +11,11 @@ import { getCurrentUser, logout } from './services/authService';
 import { getAdminStats } from './services/analyticsService';
 import { api } from './services/apiService';
 import { Icons } from './constants';
+import NexusLogo from './public/nexus-logo-modern.svg';
+import { Routes, Route, Link } from 'react-router-dom';
+import Privacy from './components/Privacy';
+import Terms from './components/Terms';
+import Contact from './components/Contact';
 import { isSupabaseConfigured as initialConfigured, supabase } from './services/supabaseClient';
 
 // Lazy-load heavy components that aren't needed on initial render
@@ -390,8 +395,18 @@ const App: React.FC = () => {
     );
   }
 
+  // Always render router so /privacy, /terms, /contact are accessible
   if (!user) {
-    return <Suspense fallback={<LazyFallback />}>{showAuth ? <AuthPage onAuthSuccess={(u) => { setUser(u); setShowAuth(false); if (!localStorage.getItem('nexus_survey_done')) setShowSurvey(true); }} /> : <LandingPage onOpenAuth={() => setShowAuth(true)} />}</Suspense>;
+    return (
+      <Routes>
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="*" element={
+          <Suspense fallback={<LazyFallback />}>{showAuth ? <AuthPage onAuthSuccess={(u) => { setUser(u); setShowAuth(false); if (!localStorage.getItem('nexus_survey_done')) setShowSurvey(true); }} /> : <LandingPage onOpenAuth={() => setShowAuth(true)} />}</Suspense>
+        } />
+      </Routes>
+    );
   }
 
   return (
@@ -400,27 +415,34 @@ const App: React.FC = () => {
       {showSurvey && <Suspense fallback={<LazyFallback />}><OnboardingSurvey onComplete={handleSurveyComplete} userName={user.personification || user.email} /></Suspense>}
       <Sidebar sessions={sessions} activeSessionId={activeSessionId} onNewChat={handleNewChat} onSelectSession={handleSelectSession} view={view} onSetView={setView} stats={userStats} onDeleteSession={handleDeleteSession} onRenameSession={handleRenameSession} onToggleFavorite={handleToggleFavorite} onOpenSettings={() => setIsSettingsOpen(true)} searchInputRef={null as any} isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} user={user} />
       <main className="flex-1 flex flex-col min-w-0 relative">
-        {view === 'chat' && activeSession ? (
-          <>
-            <ChatArea session={activeSession} isLoading={isLoading} routingInfo={routingInfo} onExport={handleExportChat} onShare={() => {}} onModelChange={handleModelChange} onToggleSidebar={() => setIsSidebarOpen(true)} isSidebarOpen={isSidebarOpen} onRegenerate={handleRegenerate} onEditMessage={handleEditMessage} onFeedback={handleFeedback} theme={theme} onThemeToggle={handleThemeToggle} onSuggestionClick={(txt) => handleSendMessage(txt)} />
-            <MessageInput onSendMessage={handleSendMessage} onStop={() => abortControllerRef.current?.abort()} isDisabled={isLoading} preferredModel={activeSession.preferredModel} onModelChange={handleModelChange} activeSessionId={activeSessionId} />
-          </>
-        ) : view === 'dashboard' ? (
-          <Suspense fallback={<LazyFallback />}><Dashboard stats={userStats!} onUpgrade={() => setView('pricing')} /></Suspense>
-        ) : view === 'pricing' ? (
-          <Suspense fallback={<LazyFallback />}><Pricing onUpgrade={() => setView('billing')} onClose={() => setView('chat')} /></Suspense>
-        ) : view === 'billing' ? (
-          <Suspense fallback={<LazyFallback />}><Billing stats={userStats!} onCancel={() => {}} onUpgrade={() => setView('pricing')} onClose={() => setView('chat')} /></Suspense>
-        ) : view === 'admin' ? (
-          <Suspense fallback={<LazyFallback />}><AdminDashboard stats={getAdminStats()} /></Suspense>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
-            <div className="w-20 h-20 bg-emerald-500/5 rounded-3xl flex items-center justify-center mb-8 border border-white/5 shadow-2xl">
-              <Icons.Robot className="w-10 h-10 text-emerald-500/40" />
-            </div>
-            <button onClick={handleNewChat} className="px-10 py-4 bg-emerald-500 rounded-2xl text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all">New Chat</button>
-          </div>
-        )}
+        <Routes>
+          <Route path="/" element={
+            view === 'chat' && activeSession ? (
+              <>
+                <ChatArea session={activeSession} isLoading={isLoading} routingInfo={routingInfo} onExport={handleExportChat} onShare={() => {}} onModelChange={handleModelChange} onToggleSidebar={() => setIsSidebarOpen(true)} isSidebarOpen={isSidebarOpen} onRegenerate={handleRegenerate} onEditMessage={handleEditMessage} onFeedback={handleFeedback} theme={theme} onThemeToggle={handleThemeToggle} onSuggestionClick={(txt) => handleSendMessage(txt)} />
+                <MessageInput onSendMessage={handleSendMessage} onStop={() => abortControllerRef.current?.abort()} isDisabled={isLoading} preferredModel={activeSession.preferredModel} onModelChange={handleModelChange} activeSessionId={activeSessionId} />
+              </>
+            ) : view === 'dashboard' ? (
+              <Suspense fallback={<LazyFallback />}><Dashboard stats={userStats!} onUpgrade={() => setView('pricing')} /></Suspense>
+            ) : view === 'pricing' ? (
+              <Suspense fallback={<LazyFallback />}><Pricing onUpgrade={() => setView('billing')} onClose={() => setView('chat')} /></Suspense>
+            ) : view === 'billing' ? (
+              <Suspense fallback={<LazyFallback />}><Billing stats={userStats!} onCancel={() => {}} onUpgrade={() => setView('pricing')} onClose={() => setView('chat')} /></Suspense>
+            ) : view === 'admin' ? (
+              <Suspense fallback={<LazyFallback />}><AdminDashboard stats={getAdminStats()} /></Suspense>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
+                <div className="w-20 h-20 bg-emerald-500/5 rounded-3xl flex items-center justify-center mb-8 border border-white/5 shadow-2xl">
+                  <img src={NexusLogo} alt="Nexus Logo" className="w-14 h-14 object-contain" />
+                </div>
+                <button onClick={handleNewChat} className="px-10 py-4 bg-emerald-500 rounded-2xl text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all">New Chat</button>
+              </div>
+            )
+          } />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/contact" element={<Contact />} />
+        </Routes>
       </main>
       
       {showOnboarding && <Suspense fallback={<LazyFallback />}><MobileOnboarding onComplete={completeOnboarding} /></Suspense>}

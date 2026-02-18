@@ -247,7 +247,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             {(isOpen || window.innerWidth < 640) && (
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg">
-                  <Icons.Robot className="w-5 h-5 text-white" />
+                  <img src="/nexus-logo-modern.svg" alt="Nexus AI Logo" className="w-7 h-7" />
                 </div>
                 <h1 className="text-[14px] font-black tracking-tight text-[var(--text-primary)] uppercase">NEXUS AI</h1>
                 {/* BEGIN: Beta Badge (remove this block to remove Beta label) */}

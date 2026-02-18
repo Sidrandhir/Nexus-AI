@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../constants';
+import NexusLogo from '../public/nexus-logo-modern.svg';
 import { User, UserStats, AIModel } from '../types';
 import { api } from '../services/apiService';
 
@@ -378,6 +379,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <footer className="px-3 sm:px-10 py-3 sm:py-8 bg-[var(--bg-secondary)]/30 border-t border-[var(--border)] flex justify-end gap-2 sm:gap-4 transition-colors backdrop-blur-md flex-shrink-0 flex-wrap">
+                      {/* Download logo button removed as requested */}
              <button 
                onClick={onClose} 
                className="px-4 sm:px-8 py-2 sm:py-3 text-[11px] sm:text-[13px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-lg sm:rounded-xl hover:bg-[var(--bg-tertiary)]/30"

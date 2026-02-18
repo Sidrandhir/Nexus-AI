@@ -1,22 +1,10 @@
-// Utility: Clean up empty/malformed Markdown in translated outputs
-function cleanTranslatedMarkdown(markdown: string): string {
-  // Only remove lines that are empty or contain ONLY ASCII whitespace/punctuation (no Unicode)
-  return markdown
-    .replace(/^#+\s*$/gm, '') // empty headings only
-    .replace(/^-+\s*$/gm, '') // empty bullets only
-    .replace(/^\*\*+\s*\*\*+$/gm, '') // empty bold
-    .replace(/```[a-z]*\n*\s*```/gm, '') // empty code blocks
-    // Remove lines that are ONLY ASCII whitespace/punctuation (but keep any with Unicode/letters)
-    .replace(/^(?=\s*[^\w\u0900-\u097F]*$)[\s\-:,.|\/\\]+$/gm, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
 
 // ...existing code...
 
 import React, { useRef, useEffect, useState, useCallback, useMemo, memo } from 'react';
 import { Message, AIModel, RouterResult, ChatSession, GroundingChunk } from '../types';
 import { Icons } from '../constants';
+import NexusLogo from '../public/nexus-logo-modern.svg';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './ChatArea.css';
@@ -331,7 +319,6 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   const codeRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const language = className?.replace('language-', '') || '';
-  // Hindi/Marathi support: render with Devanagari font if detected
   const codeString = String(children).replace(/\n$/, '');
   // Touch lock logic for horizontal scroll
   useEffect(() => {
@@ -377,18 +364,6 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   if (className === 'language-chart') return <EnhancedChart dataStr={codeString} />;
   if (language === 'mermaid') return <MermaidBlock code={codeString} />;
   if (language === 'products') return <ProductGrid dataStr={codeString} />;
-  if (language === 'hi' || language === 'mr') {
-    return (
-      <div ref={containerRef} className="relative group/code my-6 border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--code-bg)] shadow-sm max-w-full transition-all hover:border-[var(--text-secondary)]/20">
-        <div className="flex items-center justify-between px-4 py-2 bg-[var(--code-header)] border-b border-[var(--border)]">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] opacity-50">
-            {language === 'hi' ? 'हिंदी' : 'मराठी'}
-          </span>
-        </div>
-        <pre className="overflow-x-auto custom-scrollbar leading-relaxed" style={{ fontFamily: 'Noto Sans Devanagari, Mangal, Arial', fontSize: 16 }}><code>{codeString}</code></pre>
-      </div>
-    );
-  }
 
   const handleCopy = () => {
     copyToClipboard(codeString);
@@ -425,12 +400,6 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
   const highlightedHtml = useMemo(() => {
     if (!codeString) return '';
 
-    // Guard: If Devanagari detected, skip highlight.js
-    const containsDevanagari = /[\u0900-\u097F]/.test(codeString);
-    if (containsDevanagari) {
-      return codeString.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
     if (codeString.length > 20000) {
       return codeString.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
@@ -453,8 +422,14 @@ const CodeBlock = memo(({ children, className }: { children?: React.ReactNode; c
 
   return (
     <div ref={containerRef} className="relative group/code my-6 border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--code-bg)] shadow-sm max-w-full transition-all hover:border-[var(--text-secondary)]/20">
+      {/* New Chat background logo */}
+      {(!codeString && !language) && (
+        <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',zIndex:0,opacity:0.12}}>
+          <img src={NexusLogo} alt="Nexus Logo" style={{width:96,height:96,filter:'drop-shadow(0 2px 12px #16A34A66)'}} />
+        </div>
+      )}
       <div className="flex items-center justify-between px-4 py-2 bg-[var(--code-header)] border-b border-[var(--border)]">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] opacity-50">{language === 'hi' ? 'हिंदी' : language === 'mr' ? 'मराठी' : (language || 'SOURCE')}</span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] opacity-50">{language || 'SOURCE'}</span>
         <div className="flex items-center gap-3">
           <button onClick={handleDownload} className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all">
             <Icons.Download className="w-3 h-3" />
@@ -545,25 +520,7 @@ const MessageItem = memo(({ msg, isLast, isLoading, copiedId, editingId, editCon
               <div className="flex gap-2"><button onClick={() => onSubmitEdit(msg.id)} className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-xl text-[13px] sm:text-sm font-semibold active:scale-95 transition-all shadow-lg shadow-[var(--accent)]/10">Update</button><button onClick={onCancelEdit} className="px-5 py-2.5 bg-[var(--bg-secondary)] text-[var(--text-secondary)] rounded-xl text-[13px] sm:text-sm font-semibold border border-[var(--border)] active:scale-95 transition-all">Cancel</button></div>
             </div>
           ) : (
-            <div
-              className="markdown-body"
-              style={
-                msg.language === 'hi' || msg.language === 'mr'
-                  ? {
-                      fontFamily:
-                        '"Noto Sans Devanagari", "Hind", "Mukta", Mangal, system-ui, sans-serif',
-                      lineHeight: 1.8,
-                      letterSpacing: '0.2px',
-                    }
-                  : undefined
-              }
-            >
-              <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
-                {typeof msg.content === 'string' && (msg.language === 'hi' || msg.language === 'mr')
-                  ? cleanTranslatedMarkdown(msg.content)
-                  : (typeof msg.content === 'string' ? msg.content : (msg.content ? String(msg.content) : ''))}
-              </ReactMarkdown>
-            </div>
+            <div className="markdown-body"><ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>{typeof msg.content === 'string' ? msg.content : (msg.content ? String(msg.content) : '')}</ReactMarkdown></div>
           )}
           {msg.image && <div className="mt-8 rounded-xl overflow-hidden border border-[var(--border)] shadow-xl"><img src={`data:${msg.image.mimeType};base64,${msg.image.inlineData.data}`} alt="Context Attached" className="max-w-full h-auto" /></div>}
           {msg.groundingChunks && msg.groundingChunks.length > 0 && (

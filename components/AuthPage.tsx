@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Icons } from '../constants';
+import NexusLogo from '../public/nexus-logo-modern.svg';
 import { login, signup, loginWithGoogle, forgotPassword } from '../services/authService';
 import { User } from '../types';
 
@@ -9,6 +10,20 @@ interface AuthPageProps {
 }
 
 const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
+  // Back arrow for login/signup (not for forgot password)
+  const BackArrow = () => (
+    !isForgotPassword && (
+      <div className="fixed left-4 top-4 z-30">
+        <a
+          href="/"
+          className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] shadow hover:bg-[var(--accent)]/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+          aria-label="Back to Home"
+        >
+          <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </a>
+      </div>
+    )
+  );
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [name, setName] = useState('');
@@ -79,15 +94,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans">
+    <>
+      <BackArrow />
+      <div className="min-h-screen min-h-[100dvh] bg-[var(--bg-primary)] flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans">
 
       {/* Full-page content */}
       <div className="w-full max-w-[400px] z-10 flex flex-col items-center">
 
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center">
-          <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/20">
-            <Icons.Robot className="w-7 h-7 text-white" />
+          <div className="mb-5 flex items-center justify-center">
+            <img src={NexusLogo} alt="Nexus Logo" style={{width:48,height:48,filter:'drop-shadow(0 2px 8px #16A34A33)'}} />
           </div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
             {isForgotPassword ? 'Reset your password' : isLogin ? 'Welcome back' : 'Create your account'}
@@ -302,6 +319,43 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         </div>
       </div>
     </div>
+    </>
+  );
+};
+
+// Back arrow for login/signup (not for forgot password)
+const BackArrow: React.FC<{isLogin: boolean, setIsLogin: (v: boolean) => void}> = ({ isLogin, setIsLogin }) => (
+  <div className="fixed left-4 top-4 z-30">
+    {isLogin ? (
+      <a
+        href="/"
+        className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] shadow hover:bg-[var(--accent)]/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+        aria-label="Back to Home"
+      >
+        <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </a>
+    ) : (
+      <button
+        type="button"
+        onClick={() => setIsLogin(true)}
+        className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] shadow hover:bg-[var(--accent)]/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+        aria-label="Back to Login"
+      >
+        <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </button>
+    )}
+  </div>
+);
+
+const AuthPageWithBack: React.FC<AuthPageProps> = (props) => {
+  const [isLogin, setIsLogin] = React.useState(true);
+  // ...existing code...
+  // Use the original AuthPage but inject the BackArrow at the top
+  return (
+    <>
+      <BackArrow isLogin={isLogin} setIsLogin={setIsLogin} />
+      {/* ...existing AuthPage JSX, but pass isLogin/setIsLogin as props or context if needed... */}
+    </>
   );
 };
 
