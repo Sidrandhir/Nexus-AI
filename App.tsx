@@ -297,10 +297,12 @@ const App: React.FC = () => {
     } catch (error: any) {
       if (flushTimer) clearTimeout(flushTimer);
       if (error.name !== 'AbortError') {
-        addToast(error.message, "error");
         setSessions(prev => prev.map(s => s.id === sessionId ? { 
           ...s, 
-          messages: s.messages.filter(m => m.id !== assistantId) 
+          messages: s.messages.map(m => m.id === assistantId ? {
+            ...m,
+            content: "Nexus is handling heavy traffic right now. I could not complete this response in full, but your request is safe. Please press Regenerate in a few seconds for the full answer."
+          } : m)
         } : s));
       }
     } finally {

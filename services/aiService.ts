@@ -99,6 +99,117 @@ const MAX_CONCURRENT_REQUESTS = Number(process.env.NEXUS_MAX_CONCURRENT_REQUESTS
 const MAX_QUEUED_REQUESTS = Number(process.env.NEXUS_MAX_QUEUED_REQUESTS ?? 1000);
 const requestQueue = new KeyedConcurrentQueue(MAX_CONCURRENT_REQUESTS, MAX_QUEUED_REQUESTS);
 
+const RESPONSE_CACHE_TTL_MS = Number(process.env.NEXUS_RESPONSE_CACHE_TTL_MS ?? 45_000);
+const CIRCUIT_FAIL_THRESHOLD = Number(process.env.NEXUS_CIRCUIT_FAIL_THRESHOLD ?? 6);
+const CIRCUIT_FAIL_WINDOW_MS = Number(process.env.NEXUS_CIRCUIT_FAIL_WINDOW_MS ?? 30_000);
+const CIRCUIT_OPEN_MS = Number(process.env.NEXUS_CIRCUIT_OPEN_MS ?? 20_000);
+
+type CacheEntry = { value: NexusResponse; expiresAt: number };
+const responseCache = new Map<string, CacheEntry>();
+const inFlightByFingerprint = new Map<string, Promise<NexusResponse>>();
+
+const circuitState = {
+  openUntil: 0,
+  failures: [] as number[],
+};
+
+function isCircuitOpen(): boolean {
+  return Date.now() < circuitState.openUntil;
+}
+
+function markRetryableFailure(): void {
+  const now = Date.now();
+  circuitState.failures.push(now);
+  circuitState.failures = circuitState.failures.filter((ts) => now - ts <= CIRCUIT_FAIL_WINDOW_MS);
+  if (circuitState.failures.length >= CIRCUIT_FAIL_THRESHOLD) {
+    circuitState.openUntil = now + CIRCUIT_OPEN_MS;
+  }
+}
+
+function markSuccess(): void {
+  circuitState.failures = [];
+  circuitState.openUntil = 0;
+}
+
+function isRetryableMessage(message: string): boolean {
+  return /429|quota|resource exhausted|rate limit|503|unavailable|overloaded|failed to fetch|network|timeout/.test(message.toLowerCase());
+}
+
+function hashString(input: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+  }
+  return (h >>> 0).toString(36);
+}
+
+function buildFingerprint(
+  prompt: string,
+  history: Message[],
+  manualModel?: AIModel | "auto",
+  docs: AttachedDocument[] = [],
+): string {
+  const h = history
+    .slice(-4)
+    .map((m) => `${m.role}:${m.content.slice(0, 240)}`)
+    .join("|");
+  const d = docs.map((x) => `${x.title}:${x.content.length}`).join("|");
+  return hashString(`${manualModel ?? "auto"}::${prompt.slice(0, 1500)}::${h}::${d}`);
+}
+
+function buildSafeModeContent(intent: QueryIntent, prompt: string, reason: string): string {
+  const clipped = prompt.trim().replace(/\s+/g, " ").slice(0, 220);
+  if (intent === "coding") {
+    return [
+      "Nexus is in safe mode due to high traffic, so I am giving you a deterministic troubleshooting path instead of failing your request.",
+      "",
+      `**Your request:** ${clipped}`,
+      "",
+      "**Immediate Steps**",
+      "1. Reproduce once with the smallest input that still fails.",
+      "2. Capture exact error text and stack trace.",
+      "3. Isolate one likely fault area and test it with a minimal case.",
+      "4. Apply one fix at a time, then re-run tests.",
+      "",
+      `**System note:** ${reason}`,
+    ].join("\n");
+  }
+
+  return [
+    "Nexus is in safe mode due to high traffic, so I am returning a stable response path instead of an error.",
+    "",
+    `**Your request:** ${clipped}`,
+    "",
+    "**Best Next Action**",
+    "1. Break the request into one specific objective.",
+    "2. Ask for one decision/output at a time for highest accuracy.",
+    "3. Regenerate once traffic settles for a full long-form answer.",
+    "",
+    `**System note:** ${reason}`,
+  ].join("\n");
+}
+
+function buildSafeModeResponse(
+  prompt: string,
+  routing: RouterResult,
+  reason: string,
+): NexusResponse {
+  return {
+    content: buildSafeModeContent(routing.intent, prompt, reason),
+    model: routing.model,
+    tokens: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    confidence: {
+      level: "low",
+      label: "Safe Mode",
+      reason: "Traffic protection mode prevented a hard error and returned a deterministic fallback.",
+    },
+    routingContext: { ...routing, engine: "safe-mode", thinking: false },
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // P2: OBSERVABILITY — every request produces a structured event
 // Drop this into your analytics pipeline (Segment, Mixpanel, Datadog,
@@ -802,13 +913,41 @@ export const getAIResponse = async (
   signal?:          AbortSignal,
   queueKey = "global",
 ): Promise<NexusResponse> => {
-  // Enqueue by key so one conversation stays ordered while different users run in parallel.
-  return requestQueue.add(() =>
-    processRequest(
-      prompt, history, manualModel, onRouting,
-      image, documents, personification, onStreamChunk, signal,
+  const fingerprint = buildFingerprint(prompt, history, manualModel, documents);
+  const now = Date.now();
+  const cached = responseCache.get(fingerprint);
+  if (cached && cached.expiresAt > now) {
+    onRouting?.(cached.value.routingContext);
+    return cached.value;
+  }
+
+  const inFlight = inFlightByFingerprint.get(fingerprint);
+  if (inFlight) return inFlight;
+
+  const work = requestQueue
+    .add(() =>
+      processRequest(
+        prompt, history, manualModel, onRouting,
+        image, documents, personification, onStreamChunk, signal,
+      ),
+      queueKey,
     )
-  , queueKey);
+    .then((res) => {
+      if (res.routingContext.intent !== "live") {
+        responseCache.set(fingerprint, { value: res, expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS });
+      }
+      return res;
+    })
+    .catch((err) => {
+      const fallbackRoute = routePrompt(prompt, !!image, documents.length > 0);
+      return buildSafeModeResponse(prompt, fallbackRoute, normalizeErrorMessage(err));
+    })
+    .finally(() => {
+      inFlightByFingerprint.delete(fingerprint);
+    });
+
+  inFlightByFingerprint.set(fingerprint, work);
+  return work;
 };
 
 async function processRequest(
@@ -863,6 +1002,10 @@ async function processRequest(
   const useSearch     = intent === "live" || isProductQuery || freshnessSignals.test(prompt);
   const useProModel   = (nexusIntent === "technical" || nexusIntent === "analytical") && routing.complexity > 0.65;
   const engine        = useProModel ? MODELS.PRO : MODELS.FLASH;
+
+  if (isCircuitOpen()) {
+    return buildSafeModeResponse(prompt, routing, "High load protection is active. Please retry in a few seconds.");
+  }
 
   // ── Build request ───────────────────────────────────────────────
   const systemInstruction = buildSystemInstruction(nexusIntent, personification, isProductQuery);
@@ -942,6 +1085,7 @@ async function processRequest(
       const content    = postProcess(fullText);
       const confidence = computeConfidence(intent, routing.complexity, useSearch);
       const latency    = Date.now() - startTime;
+      markSuccess();
 
       // Emit observability event
       emit({
@@ -973,9 +1117,10 @@ async function processRequest(
       lastError    = err;
       const msgRaw = ((err as Error).message ?? "");
       const msg    = msgRaw.toLowerCase();
-      const isRetryable = /429|quota|resource exhausted|rate limit|503|unavailable|overloaded|failed to fetch|network/.test(msg);
+      const isRetryable = isRetryableMessage(msg);
 
       if (isRetryable && attempt < MAX_RETRIES - 1) {
+        markRetryableFailure();
         const backoff = Math.min(1500 * 2 ** attempt, 20_000);
         console.warn(`[Nexus] Retryable error (attempt ${attempt + 1}/${MAX_RETRIES}). Retry in ${backoff}ms…`);
         await sleep(backoff);
@@ -1004,11 +1149,16 @@ async function processRequest(
         throw err;
       }
 
-      throw new Error(normalizeErrorMessage(err));
+      if (isRetryable) markRetryableFailure();
+      return buildSafeModeResponse(prompt, routing, normalizeErrorMessage(err));
     }
   }
 
-  throw lastError;
+  return buildSafeModeResponse(
+    prompt,
+    routing,
+    normalizeErrorMessage(lastError ?? new Error("Request failed")),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════
