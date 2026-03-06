@@ -244,7 +244,8 @@ const App: React.FC = () => {
             flushTimer = setTimeout(flushToUI, 300);
           }
         },
-        abortControllerRef.current.signal
+        abortControllerRef.current.signal,
+        `${user.id}:${sessionId}`
       );
 
       // Final flush — use POST-PROCESSED content, not raw streamed text

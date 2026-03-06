@@ -40,37 +40,64 @@ const MAX_HISTORY: Record<string, number> = {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 // ═══════════════════════════════════════════════════════════════════
-// P1 FIX: TRUE ASYNC QUEUE — replaces the broken boolean lock
-// Guarantees serial execution. Zero race conditions.
-// Works correctly under multi-user load in a Node/edge runtime.
+// Concurrency scheduler
+// - Preserves in-order processing per queue key (e.g. one chat session)
+// - Allows parallel processing across different keys/users
+// - Adds back-pressure guard to avoid unbounded lag under burst traffic
 // ═══════════════════════════════════════════════════════════════════
 
-class AsyncQueue {
-  private queue: Array<() => Promise<void>> = [];
-  private running = false;
+interface QueueTask<T> {
+  key: string;
+  run: () => Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+}
 
-  add<T>(task: () => Promise<T>): Promise<T> {
+class KeyedConcurrentQueue {
+  private queue: QueueTask<any>[] = [];
+  private runningKeys = new Set<string>();
+  private activeCount = 0;
+
+  constructor(
+    private readonly maxConcurrent: number,
+    private readonly maxQueueSize: number,
+  ) {}
+
+  add<T>(task: () => Promise<T>, key = "global"): Promise<T> {
+    if (this.queue.length >= this.maxQueueSize) {
+      return Promise.reject(new Error("System busy. Please retry in a few seconds."));
+    }
+
     return new Promise<T>((resolve, reject) => {
-      this.queue.push(async () => {
-        try { resolve(await task()); }
-        catch (e) { reject(e); }
-      });
-      this.drain();
+      this.queue.push({ key, run: task, resolve, reject });
+      this.pump();
     });
   }
 
-  private async drain(): Promise<void> {
-    if (this.running) return;
-    this.running = true;
-    while (this.queue.length > 0) {
-      const task = this.queue.shift()!;
-      await task();
+  private pump(): void {
+    while (this.activeCount < this.maxConcurrent) {
+      const idx = this.queue.findIndex((t) => !this.runningKeys.has(t.key));
+      if (idx === -1) return;
+
+      const next = this.queue.splice(idx, 1)[0];
+      this.runningKeys.add(next.key);
+      this.activeCount += 1;
+
+      next.run()
+        .then(next.resolve)
+        .catch(next.reject)
+        .finally(() => {
+          this.runningKeys.delete(next.key);
+          this.activeCount -= 1;
+          this.pump();
+        });
     }
-    this.running = false;
   }
 }
 
-const requestQueue = new AsyncQueue();
+const MAX_CONCURRENT_REQUESTS = Number(process.env.NEXUS_MAX_CONCURRENT_REQUESTS ?? 16);
+const MAX_QUEUED_REQUESTS = Number(process.env.NEXUS_MAX_QUEUED_REQUESTS ?? 1000);
+const requestQueue = new KeyedConcurrentQueue(MAX_CONCURRENT_REQUESTS, MAX_QUEUED_REQUESTS);
 
 // ═══════════════════════════════════════════════════════════════════
 // P2: OBSERVABILITY — every request produces a structured event
@@ -584,6 +611,9 @@ function buildHistory(history: Message[], intent: NexusIntent): any[] {
 function postProcess(raw: string): string {
   let t = raw.trim();
 
+  // Remove known provider/truncation artifacts that occasionally leak into model text.
+  t = t.replace(/\bincomplete\s+json\s+segment\s+at\s+the\s+end\b\s*[:\-]?\s*/gi, "");
+
   // ── Remove hollow openers only (not useful context-setters) ──────
   // Only strip pure filler words, not phrases that provide orientation
   const hollowOpeners = [
@@ -664,7 +694,85 @@ function postProcess(raw: string): string {
     if (deduped.length < blocks.length) t = deduped.join("\n\n");
   }
 
-  return t.trim();
+  const cleaned = t.trim();
+  if (!cleaned) {
+    return "I could not complete that response cleanly. Please try again.";
+  }
+  return cleaned;
+}
+
+function parseEmbeddedJson(raw: string): any | null {
+  const direct = raw.trim();
+  if (!direct) return null;
+
+  try {
+    return JSON.parse(direct);
+  } catch {
+    // Try to parse first JSON object embedded in a larger string.
+  }
+
+  const start = direct.indexOf("{");
+  const end = direct.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    const maybeJson = direct.slice(start, end + 1);
+    try {
+      return JSON.parse(maybeJson);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function normalizeErrorMessage(err: unknown): string {
+  const anyErr = err as any;
+  const raw = String(
+    anyErr?.message
+    ?? anyErr?.error?.message
+    ?? anyErr?.response?.data?.error?.message
+    ?? anyErr?.response?.data?.message
+    ?? ""
+  );
+
+  const parsed = parseEmbeddedJson(raw);
+  const parsedError = parsed?.error ?? parsed;
+  const status = Number(
+    anyErr?.status
+    ?? anyErr?.code
+    ?? anyErr?.response?.status
+    ?? parsedError?.code
+    ?? 0
+  );
+
+  const statusText = String(
+    anyErr?.statusText
+    ?? parsedError?.status
+    ?? ""
+  ).toLowerCase();
+
+  const providerMsg = String(
+    parsedError?.message
+    ?? raw
+    ?? ""
+  );
+
+  const probe = `${providerMsg} ${statusText}`.toLowerCase();
+
+  if (status === 429 || /\b429\b|resource exhausted|rate limit|quota/.test(probe)) {
+    return "Nexus is receiving high traffic right now. Please retry in 20-30 seconds.";
+  }
+
+  if (/incomplete\s+json\s+segment\s+at\s+the\s+end|unexpected end of json|unterminated string in json|json/.test(probe)) {
+    return "The response was cut off before completion. Please press Regenerate.";
+  }
+
+  if (/failed to fetch|network|load failed|timeout|unavailable|overloaded/.test(probe)) {
+    return "Temporary network issue. Please try again.";
+  }
+
+  const compact = providerMsg.replace(/\s+/g, " ").trim();
+  return compact || "Something went wrong while generating the response. Please try again.";
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -692,14 +800,15 @@ export const getAIResponse = async (
   personification = "",
   onStreamChunk?:   (text: string) => void,
   signal?:          AbortSignal,
+  queueKey = "global",
 ): Promise<NexusResponse> => {
-  // Enqueue — all requests run serially, zero race conditions
+  // Enqueue by key so one conversation stays ordered while different users run in parallel.
   return requestQueue.add(() =>
     processRequest(
       prompt, history, manualModel, onRouting,
       image, documents, personification, onStreamChunk, signal,
     )
-  );
+  , queueKey);
 };
 
 async function processRequest(
@@ -749,8 +858,9 @@ async function processRequest(
   }
   const nexusIntent = mapQueryIntentToNexusIntent(intent);
   const isProductQuery = [...PRODUCT_SIGNALS].some((k) => prompt.toLowerCase().includes(k));
-  // Enable live search for all queries that may require up-to-date data
-  const useSearch     = intent === "live" || isProductQuery || nexusIntent === "analytical" || nexusIntent === "general";
+  const freshnessSignals = /(latest|today|current|right now|this week|this month|breaking|newly|updated)/i;
+  // Search only when freshness/live data is likely needed.
+  const useSearch     = intent === "live" || isProductQuery || freshnessSignals.test(prompt);
   const useProModel   = (nexusIntent === "technical" || nexusIntent === "analytical") && routing.complexity > 0.65;
   const engine        = useProModel ? MODELS.PRO : MODELS.FLASH;
 
@@ -796,11 +906,10 @@ async function processRequest(
       let usage    = { totalTokenCount: 0, promptTokenCount: 0, candidatesTokenCount: 0 };
       const groundingChunks: GroundingChunk[] = [];
 
-      // Show 'thinking...' loader for long/complex queries
+      // Stream a quick progress hint without adding artificial delay.
       const isLongOrComplex = prompt.length > 120 || routing.complexity > 0.7;
       if (onStreamChunk && isLongOrComplex) {
         onStreamChunk('Thinking...');
-        await sleep(1200 + Math.floor(Math.random() * 1200)); // 1.2–2.4s delay
       }
 
       if (onStreamChunk) {
@@ -819,7 +928,6 @@ async function processRequest(
           if (gc) groundingChunks.push(...(gc as GroundingChunk[]));
         }
       } else {
-        if (isLongOrComplex) await sleep(1200 + Math.floor(Math.random() * 1200));
         const response = await ai.models.generateContent({
           model:    engine,
           contents,
@@ -863,7 +971,8 @@ async function processRequest(
 
     } catch (err: unknown) {
       lastError    = err;
-      const msg    = ((err as Error).message ?? "").toLowerCase();
+      const msgRaw = ((err as Error).message ?? "");
+      const msg    = msgRaw.toLowerCase();
       const isRetryable = /429|quota|resource exhausted|rate limit|503|unavailable|overloaded|failed to fetch|network/.test(msg);
 
       if (isRetryable && attempt < MAX_RETRIES - 1) {
@@ -890,7 +999,12 @@ async function processRequest(
       });
 
       logError(msg, true, routing.model);
-      throw err; // Surface real error — no generic masking
+
+      if ((err as any)?.name === "AbortError") {
+        throw err;
+      }
+
+      throw new Error(normalizeErrorMessage(err));
     }
   }
 
