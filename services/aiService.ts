@@ -110,7 +110,6 @@ const apiKeyPool = [
   process.env.GEMINI_KEY_4,
   process.env.GEMINI_KEY_5,
   process.env.GEMINI_KEY_6,
-  process.env.API_KEY,
   process.env.GEMINI_API_KEY,
 ].filter((k): k is string => !!k && k.trim().length > 0);
 
