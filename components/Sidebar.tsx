@@ -300,10 +300,10 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="sidebar-session-list sidebar-session-list-simple">{favorites.map(renderSessionItem)}</div>
             )}
           </div>
-          {/* Chats Section */}
+          {/* Recent Chats Section */}
           <div className="sidebar-section">
             <div className="sidebar-section-header" onClick={() => setShowChats(v => !v)}>
-              History
+              Recent Chats
               <span className="sidebar-arrow">{showChats ? 'v' : '>'}</span>
             </div>
             {showChats && (
