@@ -16,7 +16,7 @@ const Pricing: React.FC<PricingProps> = ({ onUpgrade, onClose }) => {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-[var(--bg-primary)]">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-[var(--bg-primary)] font-sans">
       <div className="max-w-4xl mx-auto space-y-12">
         <div className="relative text-center space-y-4">
           <button

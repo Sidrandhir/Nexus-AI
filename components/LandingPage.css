@@ -313,7 +313,8 @@
 }
 .hero-subtitle {
   font-size: 16px;
-  line-height: 1.7;
+  line-height: 1.8;
+  letter-spacing: 0.012em;
   color: var(--text-secondary);
   max-width: 520px;
   margin-bottom: 32px;
@@ -517,7 +518,8 @@
   color: var(--text-secondary);
   max-width: 540px;
   margin: 0 auto;
-  line-height: 1.6;
+  line-height: 1.8;
+  letter-spacing: 0.012em;
 }
 
 /* ═══════════════ HOW IT WORKS ═══════════════ */
@@ -569,7 +571,8 @@
 .step-desc {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.75;
+  letter-spacing: 0.01em;
 }
 
 /* ═══════════════ CAPABILITIES ═══════════════ */
@@ -619,7 +622,8 @@
 .cap-desc {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.65;
+  line-height: 1.75;
+  letter-spacing: 0.01em;
   margin-bottom: 18px;
 }
 .cap-tags { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -721,7 +725,8 @@
 .feature-desc {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.75;
+  letter-spacing: 0.01em;
 }
 
 /* ═══════════════ MOMENTUM / FOMO ═══════════════ */
@@ -753,7 +758,8 @@
   color: var(--text-secondary);
   max-width: 540px;
   margin: 0 auto 48px;
-  line-height: 1.6;
+  line-height: 1.8;
+  letter-spacing: 0.012em;
 }
 .momentum-stats {
   display: flex;
@@ -845,7 +851,8 @@
   font-size: 14px;
   color: var(--text-secondary);
   margin-bottom: 28px;
-  line-height: 1.6;
+  line-height: 1.75;
+  letter-spacing: 0.01em;
 }
 .btn-cta { position: relative; }
 .cta-microcopy {

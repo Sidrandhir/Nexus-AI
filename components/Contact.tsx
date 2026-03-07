@@ -12,13 +12,8 @@ const Contact: React.FC = () => (
       </a>
     </div>
     <section
-      className="max-w-3xl mx-auto my-8 sm:my-16 p-4 sm:p-8 rounded-3xl bg-[var(--bg-secondary)]/80 border border-[var(--border)] shadow-2xl shadow-emerald-500/10 animate-in slide-in-from-bottom-4 overflow-auto custom-scrollbar min-h-[60vh] max-h-[80vh]"
-      style={{
-        fontFamily: 'Inter, Segoe UI, system-ui, sans-serif',
-        wordBreak: 'break-word',
-        WebkitFontSmoothing: 'antialiased',
-        MozOsxFontSmoothing: 'grayscale',
-      }}
+      className="max-w-3xl mx-auto my-8 sm:my-16 p-4 sm:p-8 rounded-3xl bg-[var(--bg-secondary)]/80 border border-[var(--border)] shadow-2xl shadow-emerald-500/10 animate-in slide-in-from-bottom-4 overflow-auto custom-scrollbar min-h-[60vh] max-h-[80vh] font-sans response-text"
+      style={{ wordBreak: 'break-word' }}
     >
     <h1 className="text-2xl sm:text-4xl font-black text-[var(--accent)] mb-2 tracking-tight leading-tight sm:leading-tight">Contact Us</h1>
     <p className="mb-4 sm:mb-8 text-base sm:text-lg text-[var(--text-primary)] leading-relaxed sm:leading-relaxed">We value your feedback and are here to help with any questions about Nexus AI.</p>

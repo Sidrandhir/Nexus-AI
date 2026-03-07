@@ -20,7 +20,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ stats }) => {
   ].filter(d => d.value > 0), [stats.modelDistribution]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-[#171717] text-white">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-[#171717] text-white font-sans">
       <div className="max-w-6xl mx-auto space-y-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-[#2f2f2f] pb-6">
           <div>

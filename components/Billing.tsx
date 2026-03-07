@@ -12,7 +12,7 @@ const Billing: React.FC<BillingProps> = ({ stats, onCancel, onUpgrade, onClose }
   const isPro = stats.tier === 'pro';
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-[var(--bg-primary)]">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-[var(--bg-primary)] font-sans">
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
